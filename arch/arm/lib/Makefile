@@ -40,9 +40,7 @@ COBJS-y	+= board.o
 COBJS-y	+= bootm.o
 COBJS-y	+= cache.o
 ifndef CONFIG_L2_OFF
-COBJS-y += cache-l2x0.o
-else
-COBJS-$(CONFIG_L2_CACHE_BOOST) += cache-l2x0.o
+COBJS-y += cache-l2x0.o 
 endif
 ifndef CONFIG_DCACHE_OFF
 SOBJS-y += cache_init.o

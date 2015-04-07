@@ -30,13 +30,11 @@ typedef struct _customPara{
     int         eraseBootloader;
     int         eraseFlash;
     int         rebootAfterBurn;
-    int         keyOverwrite;
     struct{
         unsigned eraseBootloader    : 1;
         unsigned eraseFlash         : 1;
         unsigned rebootAfterBurn    : 1;
-        unsigned keyOverwrite       : 1;
-        unsigned resev              : 32 - 4;
+        unsigned resev              : 32 - 3;
     }bitsMap;
 }CustomPara_t;
 
@@ -62,14 +60,6 @@ typedef struct _ConfigPara{
 }ConfigPara_t;
 
 //ini parser
-int _optimus_parse_buf_2_lines(char* pTextBuf, const unsigned textSz, const char* lines[], 
-                unsigned* totalLineNum, const unsigned MaxLines);//parse text context to linces delimitted by (\r)\n
-int parse_ini_file_2_valid_lines(const char* filePath, char* iniBuf, const unsigned bufSz, char* lines[]);
-int _optimus_abandon_ini_comment_lines(char* lines[], const unsigned lineNum);
-int optimus_ini_trans_lines_2_usr_params(const char* const lines[], const unsigned lineNum, 
-                        int (*pCheckSetUseFul)(const char* setName), 
-                        int (*pParseCfgVal)(const char* setName, const char* keyName, const char* keyVal));
-
 int parse_ini_cfg_file(const char* filePath);
 
 int check_cfg_burn_parts(const ConfigPara_t* burnPara);
@@ -85,24 +75,7 @@ int sdc_burn_buf_manager_init(const char* partName, s64 imgItemSz, const char* f
 
 int get_burn_parts_from_img(HIMAGE hImg, ConfigPara_t* pcfg);
 
-//declare for aml_sysrecovery
-int optimus_sdc_burn_partitions(ConfigPara_t* pCfgPara, HIMAGE hImg, __hdle hUiProgress, int needVerify);
-
-int optimus_burn_bootlader(HIMAGE hImg);
-
-int optimus_report_burn_complete_sta(int isFailed, int rebootAfterBurn);
-
-
-int optimus_sdc_burn_switch_to_extmmc(void);
-
-//Followings are For burn keys only 
-int optimus_sdc_keysprovider_init(void);
-int optimus_sdc_keysprovider_exit(void);
-int optimus_sdc_keysprovider_open(const char* keyName, const void** pHdle);
-int optimus_sdc_keysprovider_get_keyval(const void* pHdle, u8* pBuf, unsigned* keySz);
-int optimus_sdc_keysprovider_update_license(const void* pHdle);
-
-int optimus_keysburn_onekey(const char* keyName, u8* keyVal, unsigned keyValLen);
+u64 get_data_parts_size(HIMAGE hImg);
 
 #endif//#ifndef __OPTIMUS_SDC_BURN_I_H__
 

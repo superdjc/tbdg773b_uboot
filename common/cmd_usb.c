@@ -28,7 +28,6 @@
 #include <common.h>
 #include <command.h>
 #include <asm/byteorder.h>
-#include <asm/unaligned.h>
 #include <part.h>
 #include <usb.h>
 
@@ -150,8 +149,7 @@ void usb_display_class_sub(unsigned char dclass, unsigned char subclass,
 
 void usb_display_string(struct usb_device *dev, int index)
 {
-	ALLOC_CACHE_ALIGN_BUFFER(char, buffer, 256);
-
+	char buffer[256];
 	if (index != 0) {
 		if (usb_string(dev, index, &buffer[0], 256) > 0)
 			printf("String: \"%s\"", buffer);
@@ -192,7 +190,7 @@ void usb_display_desc(struct usb_device *dev)
 
 }
 
-void usb_display_conf_desc(struct usb_config_descriptor *config,
+void usb_display_conf_desc(struct usb_configuration_descriptor *config,
 			   struct usb_device *dev)
 {
 	printf("   Configuration: %d\n", config->bConfigurationValue);
@@ -242,7 +240,7 @@ void usb_display_ep_desc(struct usb_endpoint_descriptor *epdesc)
 		printf("Interrupt");
 		break;
 	}
-	printf(" MaxPacket %d", get_unaligned(&epdesc->wMaxPacketSize));
+	printf(" MaxPacket %d", epdesc->wMaxPacketSize);
 	if ((epdesc->bmAttributes & 0x03) == 0x3)
 		printf(" Interval %dms", epdesc->bInterval);
 	printf("\n");
@@ -271,24 +269,12 @@ void usb_display_config(struct usb_device *dev)
 
 static inline char *portspeed(int speed)
 {
-	char *speed_str;
-
-	switch (speed) {
-	case USB_SPEED_SUPER:
-		speed_str = "5 Gb/s";
-		break;
-	case USB_SPEED_HIGH:
-		speed_str = "480 Mb/s";
-		break;
-	case USB_SPEED_LOW:
-		speed_str = "1.5 Mb/s";
-		break;
-	default:
-		speed_str = "12 Mb/s";
-		break;
-	}
-
-	return speed_str;
+	if (speed == USB_SPEED_HIGH)
+		return "480 Mb/s";
+	else if (speed == USB_SPEED_LOW)
+		return "1.5 Mb/s";
+	else
+		return "12 Mb/s";
 }
 
 /* shows the device tree recursively */
@@ -546,7 +532,7 @@ int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		 (strncmp(argv[1], "start", 5) == 0)) {
 		usb_stop();
 		printf("(Re)start USB(%d)...\n",usb_index);
-		i = usb_init();
+		i = usb_init(usb_index);
 		if (i >= 0) {
 #ifdef CONFIG_USB_STORAGE
 			/* try to recognize storage devices immediately */

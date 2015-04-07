@@ -157,10 +157,6 @@ endif
 	@echo config command: \"make m8b_m201C_512M_config\"
 
 	@echo =======================================================================
-	@echo The mark in board is "M8B_M201C_512M with TEE"
-	@echo config command: \"make m8b_m201C_512M_tee_config\"
-
-	@echo =======================================================================
 	@echo The mark in board is "M8B_M201_1G with TEE"
 	@echo config command: \"make m8b_m201_1G_tee_config\"
 
@@ -185,48 +181,12 @@ endif
 	@echo config command: \"make m8m2_n200C_v1_config\"
 
 	@echo =======================================================================
-	@echo The mark in board is "M8M2_N200C_V1 with TEE"
-	@echo config command: \"make m8m2_n200C_v1_tee_config\"
-
-	@echo =======================================================================
 	@echo The mark in board is "M8M2_N100_2G"
 	@echo config command: \"make m8m2_n100_2G_config\"
 
 	@echo =======================================================================
 	@echo The mark in board is "M8M2_N101_1G"
 	@echo config command: \"make m8m2_n101_1G_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9TV_SKT_V1"
-	@echo config command: \"make g9tv_skt_v1_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9TV_N210_V1"
-	@echo config command: \"make g9tv_n210_v1_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9TV_N300_V1"
-	@echo config command: \"make g9tv_n300_v1_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9TV_N301_V1"
-	@echo config command: \"make g9tv_n301_v1_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9BABY_SKT_V1"
-	@echo config command: \"make g9b_skt_v1_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9BABY_N302_V1"
-	@echo config command: \"make g9b_n302_v1_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9BABY_N303_V1"
-	@echo config command: \"make g9b_n303_v1_config\"
-
-	@echo =======================================================================
-	@echo The mark in board is "G9BABY_PXP"
-	@echo config command: \"make g9b_pxp_config\"
 
 	@echo
 sinclude $(wildcard $(SRCTREE)/customer/board/Readme.mk)

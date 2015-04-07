@@ -494,6 +494,7 @@ static int bootm_load_os(image_info_t os, ulong *load_end, int boot_progress)
 				show_boot_progress (-6);
 			return BOOTM_ERR_RESET;
 		}
+
 		*load_end = load + unc_len;
 		break;
 #endif /* CONFIG_LZO */
@@ -701,11 +702,6 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	AML_LOG_INIT("cmd_bootm");
 	AML_LOG_TE("cmd_bootm");
-
-#if defined(CONFIG_L2_CACHE_BOOST)
-	extern void l2x0_enable_x(void);
-	l2x0_enable_x();
-#endif	
 	
 #ifdef TEST_UBOOT_BOOT_SPEND_TIME
 	bootm_start_time = get_utimer(0);
@@ -747,11 +743,6 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if(ret != 0)
 	{
 		printf("Error! Illegal kernel image, please check!\n");
-
-#if defined(CONFIG_L2_CACHE_BOOST)
-		extern void l2x0_disable_x(void);
-		l2x0_disable_x();
-#endif	
 		return ret;
 	}		
 #endif //CONFIG_M6_SECU_BOOT
@@ -770,14 +761,7 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	ret = aml_sec_boot_check(aml_get_kernel_crypto_addr(argc < 2 ? NULL : argv[1]));
 #endif
 	if(0 != ret)
-	{
-
-#if defined(CONFIG_L2_CACHE_BOOST)
-		extern void l2x0_disable_x(void);
-		l2x0_disable_x();
-#endif
 		return ret;	
-	}
 #endif //CONFIG_AML_SECU_BOOT_V2
 
 
@@ -802,27 +786,13 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		 * Right now we assume the first arg should never be '-'
 		 */
 		if ((*endp != 0) && (*endp != ':') && (*endp != '#'))
-		{
-
-#if defined(CONFIG_L2_CACHE_BOOST)
-			extern void l2x0_disable_x(void);
-			l2x0_disable_x();
-#endif
 			return do_bootm_subcommand(cmdtp, flag, argc, argv);
-		}
 	}
 
 	AML_LOG_TE("cmd_bootm");
 
 	if (bootm_start(cmdtp, flag, argc, argv))
-	{
-
-#if defined(CONFIG_L2_CACHE_BOOST)
-		extern void l2x0_disable_x(void);
-		l2x0_disable_x();
-#endif
 		return 1;
-	}
 
 	AML_LOG_TE("cmd_bootm");
 
@@ -851,11 +821,6 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	ret = bootm_load_os(images.os, &load_end, 1);
 
 	AML_LOG_TE("cmd_bootm");
-
-#if defined(CONFIG_L2_CACHE_BOOST)
-	extern void l2x0_disable_x(void);
-	l2x0_disable_x();
-#endif	
 
 	if (ret < 0) {
 		if (ret == BOOTM_ERR_RESET)

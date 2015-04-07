@@ -40,7 +40,6 @@ cache_init:
 
 #ifndef CONFIG_L2_OFF
 	bl l2x0_enable
-	//bl l2x0_enable_x
 #endif	
 
 	mov	pc, r11

@@ -240,15 +240,8 @@ int board_usb_stop(void)
 
 	return 0;
 }
-
-int usb_index = 0;
 void board_usb_init(amlogic_usb_config_t * usb_cfg)
 {
 	g_usb_cfg = usb_cfg;
-}
-
-int get_usb_count(void)
-{
-    return  usb_index;
 }
 #endif //CONFIG_USB_DWC_OTG_HCD

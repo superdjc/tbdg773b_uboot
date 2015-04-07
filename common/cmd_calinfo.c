@@ -7,10 +7,11 @@
 
 int do_calinfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-#if defined(CONFIG_AML_MESON_8)
 	char buf[EFUSE_BYTES];
     unsigned char ver, tmp;
     int print = 0;
+#if defined(CONFIG_AML_MESON_8)
+
 	memset(buf, 0, sizeof(buf));
 	
 	if(argc <= 2){

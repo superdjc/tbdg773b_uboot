@@ -74,31 +74,9 @@ static int amlnand_oops_handle(struct amlnand_chip *aml_chip, int flag)
 	unsigned erase_shift, write_shift, pages_per_blk;
 	int  start_blk,total_blk, ret = 0;
 	int percent=0, percent_complete = -1;
-	unsigned char *buf = NULL;
-	unsigned int buf_size = MAX(CONFIG_SECURE_SIZE,CONFIG_KEYSIZE);
-
-	buf = aml_nand_malloc(buf_size);
-	if(!buf){
-	  aml_nand_msg("aml_sys_info_init : malloc failed");
-	}
-	memset(buf,0x0,buf_size);		
 	
-#ifdef CONFIG_SECURITYKEY
-	ret = amlnand_info_init(aml_chip, (unsigned char *)&(aml_chip->nand_key),buf,(unsigned char *)KEY_INFO_HEAD_MAGIC, CONFIG_KEYSIZE);
-	if(ret < 0){
-		aml_nand_msg("invalid nand key\n");
-		goto exit_error0;
-	}
-#endif
+	aml_nand_dbg("amlnand_oops_handle!!! ");
 
-#ifdef CONFIG_SECURE_NAND
-	ret = amlnand_info_init(aml_chip, (unsigned char *)&(aml_chip->nand_secure),buf,(unsigned char *)SECURE_INFO_HEAD_MAGIC, CONFIG_SECURE_SIZE);
-	if(ret < 0){
-		aml_nand_msg("invalid nand secure_ptr\n");
-		goto exit_error0;
-	}
-#endif	
-	
 	erase_shift = ffs(flash->blocksize) - 1;
 	write_shift =  ffs(flash->pagesize) - 1;
 	erase_len = ((uint64_t)(flash->chipsize*controller->chip_num))<<20;
@@ -181,11 +159,7 @@ static int amlnand_oops_handle(struct amlnand_chip *aml_chip, int flag)
 				aml_nand_msg("nand erasing %d %% --%d %% complete",percent,percent+10);
 		}
 	}
-exit_error0:
-	if(buf){
-		kfree(buf);
-		buf = NULL;
-	}	
+
 	return ret;
 }
 
@@ -193,8 +167,10 @@ int  phrase_driver_version(unsigned int cp, unsigned int cmp)
 {
 	int ret=0;
 
-	if((((cp >> 24)&0xff) != ((cmp >> 24)&0xff)) || (((cp >> 16)&0xff) != ((cmp >> 16)&0xff)) \
-        || (((cp >> 8)&0xff) != ((cmp >> 8)&0xff)) || ((cp&0xff) != (cmp&0xff))){
+	if(((cp >> 24)&0xff) != ((cp >> 24)&0xff)){
+		ret = -1;
+	}
+	if(((cp >> 16)&0xff)!= ((cp >> 16)&0xff)){	
 		ret = -1;
 	}
 	return ret;
@@ -213,7 +189,7 @@ void reset_amlchip_member(struct amlnand_chip *aml_chip)
 
 #endif
 
-unsigned int aml_info_checksum(unsigned char *data,int lenth)
+static unsigned int aml_info_checksum(unsigned char *data,int lenth)
 {
 	unsigned int checksum;
 	unsigned char *pdata;
@@ -253,15 +229,6 @@ static int aml_info_check_datasum(void *data,unsigned char *name)
 			crc = config->crc;
 			if(aml_info_checksum((unsigned char *)(config->dev_para),(MAX_DEVICE_NUM*sizeof(struct dev_para))) != crc){
 				aml_nand_msg("aml_info_check_datasum : nand check config crc error");
-				ret = -NAND_READ_FAILED;
-			}
-		}
-    
-	if(!memcmp(name,PHY_PARTITION_HEAD_MAGIC,4)){
-			struct phy_partition_info * phy_part = (struct phy_partition_info *)data;
-			crc = phy_part->crc;
-			if(aml_info_checksum((unsigned char *)(phy_part->partition),(MAX_DEVICE_NUM*sizeof(struct _phy_partition))) != crc){
-				aml_nand_msg("aml_info_check_datasum : nand check phy partition crc error");
 				ret = -NAND_READ_FAILED;
 			}
 		}
@@ -905,9 +872,9 @@ int amlnand_save_info_by_name(struct amlnand_chip *aml_chip,unsigned char * info
 	phys_erase_shift = ffs(flash->blocksize) - 1;
 	phys_page_shift =  ffs(flash->pagesize) - 1;
 	pages_per_blk = (1 << (phys_erase_shift -phys_page_shift));
-    //aml_nand_msg("size:%d",size);
+    aml_nand_msg("size:%d",size);
 	arg_pages = ((size>>phys_page_shift) + 1);
-    //aml_nand_msg("arg_pages:%d",arg_pages);
+    aml_nand_msg("arg_pages:%d",arg_pages);
     if((size%flash->pagesize)==0)
     {
         extra_page = 1;
@@ -915,7 +882,7 @@ int amlnand_save_info_by_name(struct amlnand_chip *aml_chip,unsigned char * info
     {
         extra_page = 0;
     }
-    //aml_nand_msg("extra_page:%d",extra_page);
+    aml_nand_msg("extra_page:%d",extra_page);
 	tmp_blk = (offset >> phys_erase_shift);
 	
 	if((flash->new_type) &&((flash->new_type < 10)||(flash->new_type == SANDISK_19NM)))
@@ -2104,9 +2071,9 @@ int amlnand_configs_confirm(struct amlnand_chip *aml_chip)
 
 	ret = phrase_driver_version(config_ptr->driver_version,DRV_PHY_VERSION);
 	if(ret){
-		aml_nand_msg("driver_version in nand  %d.%02d.%03d.%04d ",(config_ptr->driver_version >> 24)&0xff,
+		aml_nand_msg("nand driver version confirm failed :  driver_version in nand  %d.%02d.%03d.%04d ",(config_ptr->driver_version >> 24)&0xff,
 		(config_ptr->driver_version >> 16)&0xff,(config_ptr->driver_version >> 8)&0xff,(config_ptr->driver_version)&0xff);
-		//confirm_flag = 1;
+		confirm_flag = 1;
 	}
 
 		
@@ -2727,10 +2694,6 @@ void amlnand_config_buf_free(struct amlnand_chip *aml_chip)
 		kfree(aml_chip->config_ptr);
 		aml_chip->config_ptr = NULL;
 	}
-    if (aml_chip->phy_part_ptr) {
-		kfree(aml_chip->phy_part_ptr);
-		aml_chip->phy_part_ptr = NULL;
-	}
 	if (aml_chip->user_oob_buf) {
 		kfree(aml_chip->user_oob_buf);
 		aml_chip->user_oob_buf = NULL;
@@ -2801,14 +2764,6 @@ static int amlnand_config_buf_malloc(struct amlnand_chip *aml_chip)
 	}
 	memset(aml_chip->config_ptr, 0x0, (sizeof(struct nand_config)));
 
-	aml_chip->phy_part_ptr = aml_nand_malloc(sizeof(struct phy_partition_info));
-	if(aml_chip->phy_part_ptr == NULL){
-		aml_nand_msg("malloc failed for phy_part_ptr ");
-		ret = -NAND_MALLOC_FAILURE;
-		goto exit_error0;
-	}
-	memset(aml_chip->phy_part_ptr, 0x0, (sizeof(struct phy_partition_info)));
-
 	return ret;
 	
 exit_error0:
@@ -2825,7 +2780,6 @@ void amlnand_set_config_attribute(struct amlnand_chip *aml_chip)
 	aml_chip->nand_secure.arg_type = FULL_PAGE;
 	aml_chip->nand_key.arg_type = FULL_PAGE;  
 	aml_chip->uboot_env.arg_type = FULL_PAGE;  
-    aml_chip->nand_phy_partition.arg_type = FULL_PAGE;
 
 	return;
 }
@@ -2890,16 +2844,15 @@ int  shipped_bbt_invalid_ops(struct amlnand_chip *aml_chip)
 	// nand_arg_info * nand_key = &aml_chip->nand_key;  
 	//nand_arg_info  * nand_secure= &aml_chip->nand_secure;
 	unsigned char *buf = NULL;
-	int  ret = 0;
-#if 0	
 	unsigned int buf_size = MAX(CONFIG_SECURE_SIZE,CONFIG_KEYSIZE);
+	int  ret = 0;
 
 	buf = aml_nand_malloc(buf_size);
 	if(!buf){
 	  aml_nand_msg("aml_sys_info_init : malloc failed");
 	}
 	memset(buf,0x0,buf_size);
-#endif
+
 /*
 	clean nand case!!!!!
 */
@@ -2950,7 +2903,7 @@ int  shipped_bbt_invalid_ops(struct amlnand_chip *aml_chip)
 #endif
   
 #ifdef CONFIG_SECURE_NAND
-	ret = amlnand_info_init(aml_chip, (unsigned char *)&(aml_chip->nand_secure),buf,(unsigned char *)SECURE_INFO_HEAD_MAGIC, CONFIG_SECURE_SIZE);
+	ret = amlnand_info_init(aml_chip, &(aml_chip->nand_secure),buf,SECURE_INFO_HEAD_MAGIC, CONFIG_SECURE_SIZE);
 		if(ret < 0){
 			aml_nand_msg("invalid nand secure_ptr\n");
 			goto exit_error0;
@@ -3261,7 +3214,7 @@ int amlnand_get_dev_configs(struct amlnand_chip *aml_chip)
 
 	amlnand_set_config_attribute(aml_chip);
 
-	if((aml_chip->init_flag > NAND_BOOT_ERASE_PROTECT_CACHE)){ //upgrade will enter
+	if((aml_chip->init_flag > NAND_BOOT_ERASE_PROTECT_CACHE)){
 		
 //		ret = amlnand_info_init(aml_chip, &(aml_chip->shipped_bbtinfo),aml_chip->shipped_bbt_ptr,SHIPPED_BBT_HEAD_MAGIC, sizeof(struct shipped_bbt));
 		
@@ -3314,7 +3267,7 @@ int amlnand_get_dev_configs(struct amlnand_chip *aml_chip)
 			amlnand_oops_handle(aml_chip,aml_chip->init_flag);
 
 	}
-	else{// normal boot will enter
+	else{
 		//search  bbt
 		ret = amlnand_info_init(aml_chip, (unsigned char *)&(aml_chip->nand_bbtinfo),(unsigned char *)(aml_chip->block_status),(unsigned char *)BBT_HEAD_MAGIC, sizeof(struct block_status));
 		if(ret < 0){
@@ -3359,7 +3312,7 @@ int amlnand_get_dev_configs(struct amlnand_chip *aml_chip)
 		}
 	}
 
-	if((aml_chip->init_flag < NAND_BOOT_ERASE_PROTECT_CACHE)){	//normal boot will enter
+	if((aml_chip->init_flag < NAND_BOOT_ERASE_PROTECT_CACHE)){	
 #ifdef AML_NAND_UBOOT
 	if(aml_chip->config_msg.arg_valid == 0){ // if no config,just save
 		aml_chip->config_ptr->driver_version = DRV_PHY_VERSION;
@@ -3372,12 +3325,7 @@ int amlnand_get_dev_configs(struct amlnand_chip *aml_chip)
 			goto exit_error0;
 		}
 	}
-    //scan phy partition info here, if we can't find phy partition, we will calc and save it in phydev init stage.
-    ret = amlnand_info_init(aml_chip, (unsigned char *)&(aml_chip->nand_phy_partition),(unsigned char *)aml_chip->phy_part_ptr,(unsigned char *)PHY_PARTITION_HEAD_MAGIC, sizeof(struct phy_partition_info));
-    if(ret < 0){
-        aml_nand_msg("nand scan phy partition info failed and ret:%d, will calc and save in in phydev init stage.",ret);    
-    }
-
+	
 	if(flash->new_type && (flash->new_type < 10) && (retry_info->default_flag == 0)){
 		ret = aml_nand_save_hynix_info(aml_chip);
 		if(ret < 0){

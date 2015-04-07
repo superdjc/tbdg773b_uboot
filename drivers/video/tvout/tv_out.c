@@ -8,10 +8,6 @@
 #include <asm/arch/tvregs.h>
 #include "tv_out.h"
 
-#ifndef printk
-#define printk printf
-#endif
-
 static int tvmode = -1;
 static int used_audio_pll=-1;
 unsigned int system_serial_low=0xA;
@@ -92,8 +88,8 @@ void  change_vdac_setting(unsigned int  vdec_setting,int  mode)
 	unsigned int  idx=0,bit=5,i;
 	switch(mode )
 	{
-		case TVMODE_480I:
-		case TVMODE_576I:
+		case TVOUT_480I:
+		case TVOUT_576I:
 		signal_set_index=0;
 		bit=5;
 		break;
@@ -172,7 +168,7 @@ static void enable_vsync_interrupt(void)
     }
 }
 
-#if (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8)
+#if CONFIG_AML_MESON_8
 static unsigned int vdac_cfg_valid = 0, vdac_cfg_value = 0;
 static unsigned int cvbs_get_trimming_version(unsigned int flag)
 {
@@ -209,12 +205,8 @@ void cvbs_config_vdac(unsigned int flag, unsigned int cfg)
 	return ;
 
 }
-
-#if defined(CONFIG_ENABLE_CVBS)
 static void cvbs_cntl_output(unsigned int open)
 {
-#if (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8)
-
 	unsigned int cntl0=0, cntl1=0;
 	
 	if( open == 0 )// close
@@ -235,11 +227,9 @@ static void cvbs_cntl_output(unsigned int open)
 		WRITE_MPEG_REG(HHI_VDAC_CNTL1, cntl1);
 		WRITE_MPEG_REG(HHI_VDAC_CNTL0, cntl0);
 	}
-#endif
 
 	return ;
 }
-#endif
 
 #if CONFIG_EFUSE
 extern int efuse_read_intlItem(char *intl_item,char *buf,int size);
@@ -401,43 +391,14 @@ static void cvbs_performance_enhancement(int mode)
 
 #endif // end of CVBS_PERFORMANCE_COMPATIBILITY_SUPPORT
 
-
-static const reg_t * tvregs_setting_mode(tvmode_t mode)
-{
-    int i = 0;
-    for(i = 0; i < ARRAY_SIZE(tvregsTab); i++) {
-        if(mode == tvregsTab[i].tvmode)
-            return tvregsTab[i].reg_setting;
-    }
-    return NULL;
-}
-
-const static tvinfo_t * tvinfo_mode(tvmode_t mode)
-{
-    int i = 0;
-    for(i = 0; i < ARRAY_SIZE(tvinfoTab); i++) {
-        if(mode == tvinfoTab[i].tvmode)
-            return &tvinfoTab[i];
-    }
-    return NULL;
-}
-
 int tv_out_open(int mode)
 {
 #if CONFIG_AML_HDMI_TX
     extern void set_disp_mode(int);
 #endif
     const  reg_t *s;
-    const tvinfo_t * tvinfo;
 
-    tvinfo = tvinfo_mode(mode);
-    if(!tvinfo) {
-        printk("tvinfo %d not find\n", mode);
-        return 0;
-    }
-    printk("TV mode %s selected.\n", tvinfo->id);
-
-    if (TVMODE_VALID(mode))
+    if (TVOUT_VALID(mode))
     {
         tvmode = mode;
 
@@ -445,15 +406,11 @@ int tv_out_open(int mode)
 		m6_enable_vdac_hw_switch(mode);
 #endif
 
-#if defined(CONFIG_ENABLE_CVBS)
+#if CONFIG_AML_MESON_8
 		cvbs_cntl_output(0);
 #endif
 
-        s = tvregs_setting_mode(mode);
-        if(!s) {
-            printk("display mode %d regs setting failed\n", mode);
-            return 0;
-        }
+        s = tvregsTab[mode];
         while (MREG_END_MARKER != s->reg)
             setreg(s++);
 
@@ -461,21 +418,22 @@ int tv_out_open(int mode)
 		cvbs_performance_enhancement(mode);
 #endif
 
-#if defined(CONFIG_ENABLE_CVBS)
+#if CONFIG_AML_MESON_8
 		if( (mode==VMODE_480CVBS) || (mode==VMODE_576CVBS) )
 		{
-#if (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8) && (!defined(CONFIG_AML_G9TV))
 			WRITE_MPEG_REG(HHI_GCLK_OTHER, READ_MPEG_REG(HHI_GCLK_OTHER) | (0x1<<10) | (0x1<<8)); //enable CVBS GATE, DAC_CLK:bit[10] = 1;VCLK2_ENCI:bit[8] = 1;
-#endif
 			cvbs_cntl_output(1);
 		}
 #endif
 
 //	tvoutc_setclk(mode);
 //	enable_vsync_interrupt();
-
-        __raw_writel(tvinfo->xres, P_VPP_POSTBLEND_H_SIZE);
-
+#if CONFIG_AML_MESON_6
+        WRITE_MPEG_REG(VPP_POSTBLEND_H_SIZE, tvinfoTab[mode].xres);
+#endif
+#if CONFIG_AML_MESON_8
+        __raw_writel(tvinfoTab[mode].xres, P_VPP_POSTBLEND_H_SIZE);
+#endif
 #if CONFIG_AML_HDMI_TX
     if( (mode==VMODE_480CVBS) || (mode==VMODE_576CVBS) )
     {
@@ -494,7 +452,7 @@ int tv_out_open(int mode)
 int tv_out_close(void)
 {
 
-    if (TVMODE_VALID(tvmode))
+    if (TVOUT_VALID(tvmode))
     {
         /* VENC_VDAC_SETTING */
         WRITE_MPEG_REG(VENC_VDAC_SETTING, 0xff);
@@ -512,7 +470,7 @@ int tv_out_cur_mode(void)
 
 int tv_out_get_info(int mode, unsigned *width, unsigned *height)
 {
-    if (TVMODE_VALID(mode))
+    if (TVOUT_VALID(mode))
     {
         *width = tvinfoTab[mode].xres;
         *height = tvinfoTab[mode].yres;

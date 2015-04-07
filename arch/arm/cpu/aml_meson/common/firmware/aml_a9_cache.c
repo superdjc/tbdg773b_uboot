@@ -342,9 +342,7 @@ static inline void mmu_setup(void)
 	asm volatile("bic	r0, r0, #0x00002000");//	@ clear bits 13(--V--)	
 
 	asm volatile("bic	r0, r0, #0x00000007");//	@ clear bits 2:0 (-CAM)
-#ifndef CONFIG_M8B
 	asm volatile("orr	r0, r0, #0x00000002");//	@ set bit 1 (--A-) Align
-#endif
 	asm volatile("orr	r0, r0, #0x00000800");//	@ set bit 12 (Z---) BTB
 	asm volatile("mcr	p15, 0, r0, c1, c0, 0");//
 
@@ -354,7 +352,7 @@ static inline void mmu_setup(void)
 	uint nVal = 0;
 	for(i = 0 ; i < 0x1000;++i)
 	{
-#if defined (CONFIG_AML_MESON_8) || defined (CONFIG_AML_G9TV)
+#if defined (CONFIG_AML_MESON_8)
 
 		if(i< CONFIG_MMU_DDR_SIZE || 0xd90 == i)
 			nVal = (i<<20)|(SEC_PROT_RW_RW | SEC_WB);		

@@ -121,8 +121,6 @@
 #define CONFIG_SDIO_BUFFER_SIZE 64*1024
 #endif
 #define NO_DELAY_DATA 0
-#define TIMEOUT_LONG     (6*1000)
-static unsigned mmc_bus_width = 0;
 
 static inline int wait_busy(unsigned timeout)
 {
@@ -159,11 +157,11 @@ STATIC_PREFIX int sdio_read(unsigned target,unsigned size,unsigned por_sel)
    unsigned SD_boot_type;
    int error;
    unsigned cmd_clk_divide;
-   unsigned arg, bus_width,timeout_cnt;
+   unsigned arg, bus_width;
    cmd_clk_divide=__plls.sdio_cmd_clk_divide;
    SD_boot_type=sdio_get_port(por_sel);
    unsigned card_type=(romboot_info->ext>>4)&0xf;
-   unsigned switch_status[16], response = 0;
+   unsigned switch_status[16];
 
 //register.h: #define SDIO_AHB_CBUS_CTRL 0x2318
 //#define SDIO_AHB_CBUS_CTRL          (volatile unsigned long *)0xc1108c60   
@@ -268,32 +266,7 @@ STATIC_PREFIX int sdio_read(unsigned target,unsigned size,unsigned por_sel)
             serial_puts("\n");
             goto DATA_READ;
     	}	
-	    timeout_cnt = 0;
-	    do{
-	    	error=sdio_send_cmd((0 << check_busy_on_dat0_bit) | // RESPONSE is R1
-	    	      (0 << repeat_package_times_bit) | // packet number
-	    	       (1 << use_int_window_bit) | // will disable interrupt
-	              (0 << response_crc7_from_8_bit) | // RESPONSE CRC7 is normal
-	              (0 << response_do_not_have_crc7_bit) | // RESPONSE has CRC7
-	              (45 << cmd_response_bits_bit) | // RESPONSE have 7(cmd)+32(respnse)+7(crc)-1 data
-	              ((0x40+13) << cmd_command_bit)  
-	    			,(1<<16 )
-	    			,TIMEOUT_DATA
-	    			,ERROR_MMC_SWITCH_BUS);
-		    writel(1<<8,P_SDIO_MULT_CONFIG);
-	    	response = READ_CBUS_REG(CMD_ARGUMENT);
-	    	if(error ){
-	    	    serial_puts("###CMD13 send status failed error:0x");
-	            serial_put_dec(error);
-	            serial_puts("\n");	           
-    		}
-		    timeout_cnt++;
-    		if(timeout_cnt > TIMEOUT_LONG){
-    	    	     serial_puts("###CMD13 send status time out\n");
-    	            goto DATA_READ;			
-    		}
-		    __udelay(1000);		
-    	  } while(error || !(response & (1<<8)) ||(((response>>9) & 0xf) == 0x07)); 
+        __udelay(5000); 
             
     }
     else{                    
@@ -353,8 +326,7 @@ STATIC_PREFIX int sdio_read(unsigned target,unsigned size,unsigned por_sel)
                       
     WRITE_CBUS_REG(SDIO_MULT_CONFIG,SD_boot_type);
     bus_width = 1;	
-    mmc_bus_width = 1;
-   __udelay(1000);                   	
+   __udelay(5000);                   	
         
 DATA_READ:   
    size=(size+511)&(~(511));
@@ -722,7 +694,7 @@ STATIC_PREFIX int sdio_read_off_size(unsigned  target,unsigned off, unsigned siz
    cmd_clk_divide=__plls.sdio_cmd_clk_divide;
    SD_boot_type=sdio_get_port(por_sel);
    unsigned card_type=(romboot_info->ext>>4)&0xf;
-//   unsigned switch_status[16];
+   unsigned switch_status[16];
 
 //register.h: #define SDIO_AHB_CBUS_CTRL 0x2318
 //#define SDIO_AHB_CBUS_CTRL		  (volatile unsigned long *)0xc1108c60	 
@@ -752,8 +724,6 @@ STATIC_PREFIX int sdio_read_off_size(unsigned  target,unsigned off, unsigned siz
 		serial_puts("\n");
 		goto DATA_READ; 	   
 	}
-   bus_width = mmc_bus_width;
-#if 0   
 	
 	//switch width bus 4bit here
 	if(card_type == CARD_TYPE_EMMC){
@@ -831,9 +801,8 @@ STATIC_PREFIX int sdio_read_off_size(unsigned  target,unsigned off, unsigned siz
 			goto DATA_READ;
 		}
 	}		
-#endif
 	
-	if(bus_width == 1){
+	
 	setbits_le32(P_SDIO_IRQ_CONFIG,1<<soft_reset_bit);
 	writel(((1<<8) | (1<<9)),P_SDIO_STATUS_IRQ);	
 	WRITE_CBUS_REG(SDIO_CONFIG,(2 << sdio_write_CRC_ok_status_bit) |
@@ -847,10 +816,8 @@ STATIC_PREFIX int sdio_read_off_size(unsigned  target,unsigned off, unsigned siz
 					  ((3)	 << cmd_clk_divide_bit));	
 					  
 	WRITE_CBUS_REG(SDIO_MULT_CONFIG,SD_boot_type);
-    	__udelay(10);
-    }
-	//bus_width = 1;	
-   //__udelay(5000);						
+	bus_width = 1;	
+   __udelay(5000);						
 		
 DATA_READ:	 
    size=(size+511)&(~(511));
@@ -963,7 +930,7 @@ static int check_magic(void * cmp, unsigned char * magic)
 
 STATIC_PREFIX int sdio_switch_partition(void)
 {
-   int error, timeout_cnt, response;
+   int error;
    unsigned card_type=(romboot_info->ext>>4)&0xf;
    
     if(card_type != CARD_TYPE_EMMC){
@@ -992,35 +959,9 @@ STATIC_PREFIX int sdio_switch_partition(void)
             return error;
     	}	
     	
-	    timeout_cnt = 0;
-	    do{
-	    	error=sdio_send_cmd((0 << check_busy_on_dat0_bit) | // RESPONSE is R1
-	    	      (0 << repeat_package_times_bit) | // packet number
-	    	       (1 << use_int_window_bit) | // will disable interrupt
-	              (0 << response_crc7_from_8_bit) | // RESPONSE CRC7 is normal
-	              (0 << response_do_not_have_crc7_bit) | // RESPONSE has CRC7
-	              (45 << cmd_response_bits_bit) | // RESPONSE have 7(cmd)+32(respnse)+7(crc)-1 data
-	              ((0x40+13) << cmd_command_bit)  
-	    			,(1<<16 )
-	    			,TIMEOUT_DATA
-	    			,ERROR_MMC_SWITCH_BUS);
-		    writel(1<<8,P_SDIO_MULT_CONFIG);
-	    	response = READ_CBUS_REG(CMD_ARGUMENT);
-	    	if(error ){
-	    	    serial_puts("###CMD13 send status failed error:0x");
-	            serial_put_dec(error);
-	            serial_puts("\n");	           
-    		}
-		    timeout_cnt++;
-    		if(timeout_cnt > TIMEOUT_LONG){
-    	    	     serial_puts("###CMD13 send status time out for switch partition\n");
-    	            return ERROR_MMC_SWITCH_BUS;		
-    		}
-		    __udelay(1000);		
-    	  } while(error || (((response>>9) & 0xf) == 0x07)); 
     	serial_puts("###eMMC switch to usr partition sucess\n");
     	
-        //__udelay(10000);   //delay 10ms;        
+        __udelay(10000);   //delay 10ms;        
     }
 
     return ERROR_NONE;

@@ -56,9 +56,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #include <amlogic/aml_pmu.h>
 #endif
 #endif
-#ifdef CONFIG_MESON_TRUSTZONE
-#include <arc_code.dat>
-#endif
+
 #if defined(AML_UBOOT_LOG_PROFILE)
 extern int __g_nTE1_4BC722B3__ ;
 extern int __g_nTE2_4BC722B3__ ;
@@ -397,11 +395,6 @@ void main_loop (void)
 	int i;
 #endif
 
-#if defined(CONFIG_MESON_TRUSTZONE) && (CONFIG_AML_SUSPEND)
-	int j;
-	int *p_code;
-#endif
-
 
 	AML_LOG_INIT("main");
 	AML_LOG_TE("main");
@@ -467,12 +460,6 @@ void main_loop (void)
 extern void init_suspend_firmware(void);
 	init_suspend_firmware();
 #else
-	extern uint32_t meson_get_share_mem_base(void);
-	p_code = (int *)meson_get_share_mem_base();
-	for(j=0;j<sizeof(arc_code)/sizeof(int);j++,p_code++)
-		*p_code=arc_code[j];
-	*(p_code-j+0x2000-1) = j;//Record the size at the tail of 32k.
-	extern uint32_t meson_trustzone_suspend_init(void);
 	meson_trustzone_suspend_init();
 #endif
 #endif

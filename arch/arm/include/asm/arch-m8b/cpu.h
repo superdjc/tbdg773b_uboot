@@ -10,9 +10,6 @@
 #if CONFIG_AML_MESON==0
 #error please define CONFIG_AML_MESON
 #endif
-
-#define CONFIG_AML_A5 1
-
 //U boot code control
 
 /*  Silent print function by Lawrence.Mok
@@ -212,11 +209,6 @@
 //#define CONFIG_SYS_NO_CP15_CACHE	1
 //#define CONFIG_DCACHE_OFF    		1
 //#define CONFIG_ICACHE_OFF    		1
-
-#if !defined(CONFIG_DISABLE_L2_CACHE_BOOST)
-    #define CONFIG_L2_CACHE_BOOST 1
-#endif
-
 
 //#define CONFIG_EFUSE 1
 

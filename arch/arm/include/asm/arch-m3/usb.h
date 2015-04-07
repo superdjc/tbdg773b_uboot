@@ -137,5 +137,5 @@ typedef struct amlogic_usb_config{
 amlogic_usb_config_t * board_usb_start(void);
 int board_usb_stop(void);
 void board_usb_init(amlogic_usb_config_t * usb_cfg);
-int get_usb_count(void);
+
 #endif //__ARCH_ARM_MESON_USB_H_U_BOOT__

@@ -2,9 +2,8 @@
 #include <io.h>
 #include <uart.h>
 #include <reg_addr.h>
-#ifndef CONFIG_MESON_TRUSTZONE
 #include "boot_code.dat"
-#endif
+
 #include <arc_pwr.h>
 
 #include <pwr_op.c>
@@ -119,17 +118,10 @@ void copy_reboot_code()
 {
 	int i;
 	int code_size;
-#ifdef CONFIG_MESON_TRUSTZONE
-	volatile unsigned char* pcode = *(int *)(0x0004);//appf_arc_code_memory[1]
-	volatile unsigned char * arm_base = (volatile unsigned char *)0x0000;
-
-	code_size = *(int *)(0x0008);//appf_arc_code_memory[2]
-#else
 	volatile unsigned char* pcode = (volatile unsigned char*)arm_reboot;
 	volatile unsigned char * arm_base = (volatile unsigned char *)0x0000;
 
 	code_size = sizeof(arm_reboot);
-#endif
 	//copy new code for ARM restart
 	for(i = 0; i < code_size; i++)
 	{
@@ -261,23 +253,23 @@ void enter_power_down()
     f_serial_puts("CEC M8:uboot: P_AO_DEBUG_REG0:\n");
     serial_put_hex(hdmi_cec_func_config,32);
     f_serial_puts("\n");
-    if(hdmi_cec_func_config & 0x1){
-        cec_off();
-    }
 #endif
  	if(p_arc_pwr_op->power_off_at_24M)
 		p_arc_pwr_op->power_off_at_24M();
 
-//	switch_24M_to_32K();
 
-//	if(p_arc_pwr_op->power_off_at_32K_1)
-//		p_arc_pwr_op->power_off_at_32K_1();
+//	while(readl(0xc8100000) != 0x13151719)
+//	{}
+	switch_24M_to_32K();
 
-//	if(p_arc_pwr_op->power_off_at_32K_2)
-//		p_arc_pwr_op->power_off_at_32K_2();
+	if(p_arc_pwr_op->power_off_at_32K_1)
+		p_arc_pwr_op->power_off_at_32K_1();
+
+	if(p_arc_pwr_op->power_off_at_32K_2)
+		p_arc_pwr_op->power_off_at_32K_2();
 
 	// gate off:  bit0: REMOTE;   bit3: UART
-//	writel(readl(P_AO_RTI_GEN_CNTL_REG0)&(~(0x8)),P_AO_RTI_GEN_CNTL_REG0);
+	writel(readl(P_AO_RTI_GEN_CNTL_REG0)&(~(0x8)),P_AO_RTI_GEN_CNTL_REG0);
 
 	if(uboot_cmd_flag == 0x87654321)//u-boot suspend cmd flag
 	{
@@ -318,16 +310,16 @@ void enter_power_down()
 	}
 
 // gate on:  bit0: REMOTE;   bit3: UART
-//	writel(readl(P_AO_RTI_GEN_CNTL_REG0)|0x8,P_AO_RTI_GEN_CNTL_REG0);
+	writel(readl(P_AO_RTI_GEN_CNTL_REG0)|0x8,P_AO_RTI_GEN_CNTL_REG0);
 
-//	if(p_arc_pwr_op->power_on_at_32K_2)
-//		p_arc_pwr_op->power_on_at_32K_2();
+	if(p_arc_pwr_op->power_on_at_32K_2)
+		p_arc_pwr_op->power_on_at_32K_2();
 
-//	if(p_arc_pwr_op->power_on_at_32K_1)
-//		p_arc_pwr_op->power_on_at_32K_1();
+	if(p_arc_pwr_op->power_on_at_32K_1)
+		p_arc_pwr_op->power_on_at_32K_1();
 
 
-//	switch_32K_to_24M();
+	switch_32K_to_24M();
 
 
 	// power on even more domains
