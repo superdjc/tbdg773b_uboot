@@ -102,14 +102,20 @@ static ucl_bool ptr_check(void)
     unsigned char x[4 * sizeof(ucl_align_t)];
     long d;
     ucl_align_t a;
+    ucl_align_t u;
 
     for (i = 0; i < (int) sizeof(x); i++)
         x[i] = UCL_BYTE(i);
 
     wrkmem = UCL_PTR_ALIGN_UP((ucl_bytep)_wrkmem, sizeof(ucl_align_t));
 
-    dict = (ucl_bytepp) (ucl_voidp) wrkmem;
-
+ #if 0
+    dict = (ucl_bytepp) wrkmem;
+#else
+    /* Avoid a compiler warning on architectures that
+     * do not allow unaligned access. */
+    u.a_ucl_bytep = wrkmem; dict = u.a_ucl_bytepp;
+#endif
     d = (long) ((const ucl_bytep) dict - (const ucl_bytep) _wrkmem);
     r &= __ucl_assert(d >= 0);
     r &= __ucl_assert(d < (long) sizeof(ucl_align_t));
@@ -162,8 +168,17 @@ static ucl_bool ptr_check(void)
         if (r == 1)
         {
             ucl_uint32 v0, v1;
-            v0 = * (ucl_uint32p) (ucl_voidp) &x[k];
-            v1 = * (ucl_uint32p) (ucl_voidp) &x[k+n];
+  #if 0
+            v0 = * (ucl_uint32 *) &x[k];
+            v1 = * (ucl_uint32 *) &x[k+n];
+#else
+            /* Avoid compiler warnings on architectures that
+             * do not allow unaligned access. */
+            u.a_uchar_p = &x[k];
+            v0 = *u.a_ucl_uint32_p;
+            u.a_uchar_p = &x[k+n];
+            v1 = *u.a_ucl_uint32_p;
+#endif
             r &= __ucl_assert(v0 > 0);
             r &= __ucl_assert(v1 > 0);
         }
@@ -171,6 +186,7 @@ static ucl_bool ptr_check(void)
 
     return r;
 }
+
 
 
 /***********************************************************************

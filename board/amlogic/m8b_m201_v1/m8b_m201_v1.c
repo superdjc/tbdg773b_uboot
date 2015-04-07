@@ -79,6 +79,23 @@ static void setup_net_chip(void)
 	eth_reg0.b.eth_urgent = 0;
 WRITE_CBUS_REG(PREG_ETHERNET_ADDR0, eth_reg0.d32);// rgmii mode
 #endif
+#ifdef CONFIG_M201_COSTDOWN
+	/* open interl pll & ethernet output clock*/
+	SET_CBUS_REG_MASK(0x10a5,1<<27);
+        SET_CBUS_REG_MASK(0x108a,0xb803);
+        SET_CBUS_REG_MASK(HHI_MPLL_CNTL9,0x5c666);
+       
+        SET_CBUS_REG_MASK(0x2050,0x7d00);
+        udelay(2000);
+	/* setup ethernet mode */
+	CLEAR_CBUS_REG_MASK(HHI_MEM_PD_REG0, (1 << 3) | (1<<2));
+	
+	/* hardware reset ethernet phy : gpioh_4 connect phyreset pin*/
+	CLEAR_CBUS_REG_MASK(PREG_PAD_GPIO3_EN_N, 1 << 23);
+	CLEAR_CBUS_REG_MASK(PREG_PAD_GPIO3_O, 1 << 23);
+	udelay(2000);
+	SET_CBUS_REG_MASK(PREG_PAD_GPIO3_O, 1 << 23);
+#endif
 	/* setup ethernet mode */
 	CLEAR_CBUS_REG_MASK(HHI_MEM_PD_REG0, (1 << 3) | (1<<2));
 	/* hardware reset ethernet phy : gpioh_4 connect phyreset pin*/
@@ -513,6 +530,11 @@ void borad_power_init(void)
 }
 int board_init(void)
 {
+#ifdef CONFIG_M201_COSTDOWN
+	/* pull up Linux rx/tx */
+	writel(readl(P_AO_RTI_PULL_UP_REG) | (3 << 0 | 3 << 16),
+			P_AO_RTI_PULL_UP_REG);
+#endif
 	borad_power_init();
 	gd->bd->bi_arch_number=MACH_TYPE_MESON6_SKT;
 	gd->bd->bi_boot_params=BOOT_PARAMS_OFFSET;
@@ -531,6 +553,22 @@ int board_init(void)
 	board_usb_init(&g_usb_config_m6_skt_b,BOARD_USB_MODE_HOST);
 	board_usb_init(&g_usb_config_m6_skt_h,BOARD_USB_MODE_CHARGER);
 #endif /*CONFIG_USB_DWC_OTG_HCD*/
+
+#ifdef CONFIG_M201_COSTDOWN
+	/* 32k clock init */
+	printf("init 32k clock\n");
+	aml_set_reg32_mask(P_PERIPHS_PIN_MUX_9,0x1<<19);//set mode GPIOX_10-->CLK_OUT3
+	WRITE_CBUS_REG(PWM_PWM_E, 0x16d016d);
+	WRITE_CBUS_REG(PWM_MISC_REG_EF, 0x8001);
+	/* init led out put */
+	//red off
+    gpio_amlogic_requst(NULL, GPIOAO_2);
+    gpio_amlogic_direction_output(NULL, GPIOAO_2, 1);
+	//green on
+    gpio_amlogic_requst(NULL, GPIOAO_13);
+    gpio_amlogic_direction_output(NULL, GPIOAO_13, 0);  
+#endif
+	
 
 	return 0;
 }
@@ -693,27 +731,37 @@ void board_dt_id_process(void)
 		mem_size += gd->bd->bi_dram[i].size;
 	}
 	mem_size = mem_size >> 20;	//MB
-	unsigned char dt_name[64] = {0};
-	strcat(dt_name, "m8b_m201_");  //please change this name when you add a new config
-	debug_print("aml_dt: %s\n", getenv("aml_dt"));
+	char dt_name[64] = {0};
+	//strcat(dt_name, "m8b_m201_");  //please change this name when you add a new config
+	//debug_print("aml_dt: %s\n", getenv("aml_dt"));
 	switch(mem_size){
-		case 2048: //2GB
-			strcat(dt_name, "2g");
-			break;
 		case 1024: //1GB
-			strcat(dt_name, "1g");
+			strcat(dt_name, "m8b_m201_1G");
 			break;
 		case 512: //512MB
-			strcat(dt_name, "512m");
+			strcat(dt_name, "m8b_m201C_512M");
 			break;
 		case 256:
-			strcat(dt_name, "256m");
+			strcat(dt_name, "m8b_m201_256M");
 			break;
 		default:
-			strcat(dt_name, "v1");
+			strcat(dt_name, "m8b_m201_v1");
 			break;
 	}
 	setenv("aml_dt", dt_name);
-	debug_print("aml_dt: %s\n", getenv("aml_dt"));
+	//debug_print("aml_dt: %s\n", getenv("aml_dt"));
 }
 #endif
+
+static int do_checkhw(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+#ifdef CONFIG_AUTO_SET_MULTI_DT_ID
+	board_dt_id_process();
+#endif
+	return 0;
+}
+
+U_BOOT_CMD(
+        checkhw, 1, 1, do_checkhw,
+        "Get the hardware revsion","[<string>]\n"
+);

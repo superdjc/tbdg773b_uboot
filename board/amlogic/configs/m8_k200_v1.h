@@ -217,7 +217,8 @@
 	#define CONFIG_USB_DWC_OTG_294	1
 #endif //#if defined(CONFIG_CMD_USB)
 
-
+#define CONFIG_ENABLE_CVBS 1
+ 
 #define CONFIG_UCL 1
 #define CONFIG_SELF_COMPRESS 
 //#define CONFIG_PREBOOT "mw da004004 80000510;mw c81000014 4000;mw c1109900 0"
@@ -350,6 +351,9 @@
         "if mmcinfo; then "\
             "if fatload mmc 0 ${loadaddr} recovery.img; then bootm;fi;"\
         "fi; "\
+        "if usb start 0; then "\
+                "if fatload usb 0 ${loadaddr} recovery.img; then bootm; fi;"\
+        "fi;"\
 	      "if imgread kernel recovery ${loadaddr}; then "\
 	        "bootm; "\
 				"else "\

@@ -9,16 +9,16 @@
 //*****************************************
 #define MODEL_NAME			"EJ070NA"	/** lcd model name */
 
-#define ACITVE_AREA_WIDTH	154	/** lcd active_area or display_area horizontal size(unit in mm, you can find it on the home page of lcd spec) */
+#define ACITVE_AREA_WIDTH	153	/** lcd active_area or display_area horizontal size(unit in mm, you can find it on the home page of lcd spec) */
 #define ACITVE_AREA_HEIGHT	90	/** lcd active_area or display_area vertical size(unit in mm, you can find it on the home page of lcd spec) */
 #define LCD_TYPE			LCD_DIGITAL_LVDS   /** lcd interface(LCD_DIGITAL_MIPI, LCD_DIGITAL_LVDS, LCD_DIGITAL_EDP, LCD_DIGITAL_TTL) */
 #define LCD_BITS			8	/** lcd bits(6, 8) */
-#define BITS_OPTION			1	/** bits_option(0=only support one mode as LCD_BITS define, 1=both support 6/8bit) */
+#define BITS_OPTION			0	/** bits_option(0=only support one mode as LCD_BITS define, 1=both support 6/8bit) */
 
 #define H_ACTIVE			1024	/** horizontal resolution */
 #define V_ACTIVE			600		/** vertical resolution */
 #define H_PERIOD			1344	/** horizontal period(htotal) */
-#define V_PERIOD			635		/** vertical period(vtotal) */
+#define V_PERIOD			661		/** vertical period(vtotal) */
 
 #define	LCD_CLK				51200000	/** clock(unit in Hz, both support clk and frame_rate, >200 regard as clk, <200 regard as frame_rate) */
 #define CLK_POL				0	/** clk_polarity(only valid for TTL) */

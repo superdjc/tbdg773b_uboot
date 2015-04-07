@@ -13,7 +13,7 @@
 *****************************************************************/
 #include "../include/phynand.h"
 
-static int check_cmdfifo_size()
+static int check_cmdfifo_size(void)
 {
 	int time_out_cnt = 0, retry_cnt = 0;
 
@@ -105,8 +105,8 @@ static int read_page(struct amlnand_chip *aml_chip)
 	unsigned plane0_page_addr, plane1_page_addr, column, page_addr;	
 	unsigned char i, bch_mode, plane_num, chip_num, chipnr, user_byte_num; 
 	unsigned char with_oob, with_data, plane0_retry_flag = 0, all_ff_flag = 0;
-	unsigned char need_retry, retry_cnt, up_page, slc_mode; 	
-	int ooblen, j, ret = 0;
+	unsigned char need_retry, retry_cnt, up_page=0, slc_mode; 	
+	int ooblen, ret = 0;
 	int new_oob = 0;
 	int retry_op_cnt = retry_info->retry_cnt_lp;
 	//aml_nand_dbg("start");
@@ -1264,8 +1264,8 @@ error_exit0:
 
 static int set_blcok_status(struct amlnand_chip *aml_chip, unsigned char chipnr, unsigned addr,int value)
 {
-	struct hw_controller *controller = &aml_chip->controller;
-	struct nand_flash *flash = &aml_chip->flash;
+	//struct hw_controller *controller = &aml_chip->controller;
+	//struct nand_flash *flash = &aml_chip->flash;
 	unsigned blk_addr = addr;
 	unsigned short *tmp_status = &aml_chip->block_status->blk_status[chipnr][0];
 	
@@ -1277,8 +1277,8 @@ static int set_blcok_status(struct amlnand_chip *aml_chip, unsigned char chipnr,
 
 static int get_blcok_status(struct amlnand_chip *aml_chip, unsigned char chipnr, unsigned addr)
 {
-	struct hw_controller *controller = &aml_chip->controller;
-	struct nand_flash *flash = &aml_chip->flash;
+	//struct hw_controller *controller = &aml_chip->controller;
+	//struct nand_flash *flash = &aml_chip->flash;
 	unsigned blk_addr = addr;
 	unsigned short * tmp_status = &aml_chip->block_status->blk_status[chipnr][0];
 #if 0
@@ -1731,27 +1731,30 @@ error_exit0:
  *************************************************************/
 static int test_block(struct amlnand_chip *aml_chip)
 {
-	struct hw_controller *controller = &aml_chip->controller;
-	struct chip_operation *operation = & aml_chip->operation;
+	//struct hw_controller *controller = &aml_chip->controller;
+	//struct chip_operation *operation = & aml_chip->operation;
 	struct chip_ops_para  *ops_para = &aml_chip->ops_para; 
 	struct nand_flash *flash = &aml_chip->flash;
-	struct en_slc_info *slc_info = &(controller->slc_info);
+	//struct en_slc_info *slc_info = &(controller->slc_info);
 	
-	unsigned char phys_erase_shift, phys_page_shift, nand_boot;  
-	unsigned i, offset,pages_per_blk, pages_read, amount_loaded =0,blk_addr = 0;
+	//unsigned char phys_erase_shift, phys_page_shift, nand_boot;  
+	unsigned char phys_erase_shift, phys_page_shift;
+	//unsigned i, offset,pages_per_blk, pages_read, amount_loaded =0,blk_addr = 0;
+	unsigned pages_per_blk, pages_read,blk_addr = 0;
 	unsigned char  oob_buf[8];
-	unsigned short total_blk;
-	int  ret = 0, len,t=0;
+	//unsigned short total_blk;
+	//int  ret = 0, len,t=0;
+	int  ret = 0, t=0;
 
-	unsigned char *dat_buf =NULL;
-    blk_addr = ops_para->page_addr;
-	dat_buf  = aml_nand_malloc(flash->pagesize);
-	if(!dat_buf){
-		aml_nand_msg("test_block: malloc failed");
-		ret =  -1;
-		goto exit;
-	}
-	memset(dat_buf, 0xa5, flash->pagesize);
+	//unsigned char *dat_buf =NULL;
+	blk_addr = ops_para->page_addr;
+//	dat_buf  = aml_nand_malloc(flash->pagesize);
+//	if(!dat_buf){
+//		aml_nand_msg("test_block: malloc failed");
+//		ret =  -1;
+//		goto exit;
+//	}
+//	memset(dat_buf, 0xa5, flash->pagesize);
 	
 
 	phys_erase_shift = ffs(flash->blocksize) - 1;
@@ -1766,45 +1769,45 @@ static int test_block(struct amlnand_chip *aml_chip)
 //	nand_get_chip(aml_chip);
 //#endif	
     //erase
-    aml_nand_msg("erase addr = %ld",ops_para->page_addr);
-
-	ret = erase_block(aml_chip); 	
-	if(ret < 0){
-		aml_nand_msg("nand blk erase failed");
-		ret =  -1;
-		goto exit;
-	}
-    aml_nand_msg("nand blk %ld erase OK",blk_addr);
-    #if 1
+	  //aml_nand_msg("erase addr = %ld",ops_para->page_addr);
+	
+//		ret = erase_block(aml_chip); 	
+//		if(ret < 0){
+//			aml_nand_msg("nand blk erase failed");
+//			ret =  -1;
+//			goto exit;
+//		}
+	  //aml_nand_msg("nand blk %ld erase OK",blk_addr);
+#if 1
     //read
-    memset((unsigned char *)ops_para, 0x0, sizeof(struct chip_ops_para));
-    ops_para->page_addr = blk_addr;
-	for(t = 0; t < pages_read; t++){
-		memset(aml_chip->user_page_buf, 0x0, flash->pagesize);
-        ops_para->page_addr += t;
-		ops_para->data_buf = aml_chip->user_page_buf;
-		ops_para->oob_buf = aml_chip->user_oob_buf;
-		ops_para->ooblen = sizeof(oob_buf);
-
-		ret = read_page(aml_chip);
-		if(ret < 0){
-			aml_nand_msg("nand read %ld failed",blk_addr);
-			ret =  -1;
-			goto exit;
-		}
-		//aml_nand_dbg("aml_chip->user_page_buf: ");
-		//show_data_buf(aml_chip->user_page_buf);
-		//aml_nand_dbg("dat_buf: ");
-		//show_data_buf(dat_buf);
-	}
-    aml_nand_msg("nand blk read OK");
+//    memset((unsigned char *)ops_para, 0x0, sizeof(struct chip_ops_para));
+//    ops_para->page_addr = blk_addr;
+//	for(t = 0; t < pages_read; t++){
+//		memset(aml_chip->user_page_buf, 0x0, flash->pagesize);
+//        ops_para->page_addr += t;
+//		ops_para->data_buf = aml_chip->user_page_buf;
+//		ops_para->oob_buf = aml_chip->user_oob_buf;
+//		ops_para->ooblen = sizeof(oob_buf);
+//
+//		ret = read_page(aml_chip);
+//		if(ret < 0){
+//			aml_nand_msg("nand read %ld failed",blk_addr);
+//			ret =  -1;
+//			goto exit;
+//		}
+//		//aml_nand_dbg("aml_chip->user_page_buf: ");
+//		//show_data_buf(aml_chip->user_page_buf);
+//		//aml_nand_dbg("dat_buf: ");
+//		//show_data_buf(dat_buf);
+//	}
+//    aml_nand_msg("nand blk read OK");
     
     //write
     memset((unsigned char *)ops_para, 0x0, sizeof(struct chip_ops_para));
     ops_para->page_addr = blk_addr;
+		memset( aml_chip->user_page_buf, 0xa5, flash->pagesize);
     for(t = 0; t < pages_read; t++){
-        memset( aml_chip->user_page_buf, 0xa5, flash->pagesize);
-        ops_para->page_addr += t;
+        ops_para->page_addr += 1;
         ops_para->data_buf = aml_chip->user_page_buf;
         ops_para->oob_buf = aml_chip->user_oob_buf;
         ops_para->ooblen = sizeof(oob_buf);
@@ -1816,56 +1819,56 @@ static int test_block(struct amlnand_chip *aml_chip)
             goto exit;
         }
     }
-    aml_nand_msg("nand blk %d write OK",blk_addr);
+    //aml_nand_msg("nand blk %d write OK",blk_addr);
     //read
-	memset((unsigned char *)ops_para, 0x0, sizeof(struct chip_ops_para));
+		memset((unsigned char *)ops_para, 0x0, sizeof(struct chip_ops_para));
     ops_para->page_addr = blk_addr;
-	for(t = 0; t < pages_read; t++){
-		memset(aml_chip->user_page_buf, 0x0, flash->pagesize);
-        ops_para->page_addr += t;
-		ops_para->data_buf = aml_chip->user_page_buf;
-		ops_para->oob_buf = aml_chip->user_oob_buf;
-		ops_para->ooblen = sizeof(oob_buf);
-
-		ret = read_page(aml_chip);
+		//memset(aml_chip->user_page_buf, 0x0, flash->pagesize);
+     //aml_nand_msg("test block read!!!!!!!0x%x", ops_para->page_addr);
+		for(t = 0; t < pages_read; t++){
+	        ops_para->page_addr += 1;
+			ops_para->data_buf = aml_chip->user_page_buf;
+			ops_para->oob_buf = aml_chip->user_oob_buf;
+			ops_para->ooblen = sizeof(oob_buf);
+			ret = read_page(aml_chip);
+			if((ret < 0)|| (ops_para->ecc_err) ){
+				aml_nand_msg("nand read failed");
+				ret =  -1;
+				//goto exit;
+				break;
+			}
+			//aml_nand_dbg("aml_chip->user_page_buf: ");
+			//show_data_buf(aml_chip->user_page_buf);
+			//aml_nand_dbg("dat_buf: ");
+			//show_data_buf(dat_buf);
+		}
+   // aml_nand_msg("nand blk %d read OK",blk_addr);
+    //erase
+		ops_para->page_addr = blk_addr;
+		//erase_block(aml_chip);
+		ret = erase_block(aml_chip); 	
 		if(ret < 0){
-			aml_nand_msg("nand read failed");
+			aml_nand_msg("nand blk erase failed");
 			ret =  -1;
 			goto exit;
 		}
-		//aml_nand_dbg("aml_chip->user_page_buf: ");
-		//show_data_buf(aml_chip->user_page_buf);
-		//aml_nand_dbg("dat_buf: ");
-		//show_data_buf(dat_buf);
-	}
-    aml_nand_msg("nand blk %d read OK",blk_addr);
-    //erase
-    ops_para->page_addr = blk_addr;
-	ret = erase_block(aml_chip); 	
-	if(ret < 0){
-		aml_nand_msg("nand blk erase failed");
-		ret =  -1;
-		goto exit;
-	}
-    aml_nand_msg("nand blk %d erase OK",blk_addr);
-    #endif
+#endif
 exit:
-//#ifdef AML_NAND_UBOOT
-//        nand_release_chip();
-//#else
-//        nand_release_chip(aml_chip);
-//#endif
+		if(ops_para->ecc_err){
+			ret = -1;
+		}
+	
+//    if(dat_buf){
+//        aml_nand_free(dat_buf);
+//        dat_buf=NULL;
+//    }
 
-        if(dat_buf){
-            aml_nand_free(dat_buf);
-            dat_buf=NULL;
-        }
+    if(!ret){
+        //aml_nand_msg("blk test OK");
+    }
     
-        if(!ret){
-            aml_nand_msg("blk test OK");
-        }
-        
-        return ret;
+    ops_para->page_addr = blk_addr;//!!!!!!!!
+    return ret;
 }
 
 /************************************************************
@@ -1877,16 +1880,19 @@ exit:
 static int test_block_reserved(struct amlnand_chip *aml_chip, int tst_blk)
 {
 	struct hw_controller *controller = &aml_chip->controller;
-	struct chip_operation *operation = & aml_chip->operation;
+	//struct chip_operation *operation = & aml_chip->operation;
 	struct chip_ops_para  *ops_para = &aml_chip->ops_para; 
 	struct nand_flash *flash = &aml_chip->flash;
 	struct en_slc_info *slc_info = &(controller->slc_info);
 	
 	unsigned char phys_erase_shift, phys_page_shift, nand_boot;  
-	unsigned i, offset,pages_per_blk, pages_read, amount_loaded =0;
+	//unsigned i, offset,pages_per_blk, pages_read, amount_loaded =0;
+	unsigned offset, pages_per_blk, pages_read;
 	unsigned char  oob_buf[8];
-	unsigned short total_blk, tmp_blk;
-	int  ret = 0, len,t=0;
+	//unsigned short total_blk, tmp_blk;
+	unsigned short tmp_blk;
+	//int  ret = 0, len,t=0;
+	int  ret = 0, t=0;
 
 	unsigned char *dat_buf =NULL;
 
@@ -2042,11 +2048,11 @@ static int blk_modify_bbt_chip_op(struct amlnand_chip *aml_chip,int value)
 	struct hw_controller *controller = &aml_chip->controller;
 	struct nand_flash *flash = &aml_chip->flash;
 	struct chip_ops_para *ops_para = &aml_chip->ops_para;	
-	struct chip_operation *operation = & aml_chip->operation;
+	//struct chip_operation *operation = & aml_chip->operation;
 
 	unsigned blk_addr, page_per_blk_shift;
 	unsigned char chip_num = 1, chipnr;
-	unsigned char  oob_buf[8];
+	//unsigned char  oob_buf[8];
 	int ret = 0;
 
 	if(ops_para->option & DEV_MULTI_CHIP_MODE){
@@ -2117,9 +2123,9 @@ static int blk_modify_bbt_chip_op(struct amlnand_chip *aml_chip,int value)
 
 	return ret;
 	
-exit_error0:
+//exit_error0:
 
-	return ret;
+	//return ret;
 }
 
 
@@ -2134,11 +2140,11 @@ static int update_bbt_chip_op(struct amlnand_chip *aml_chip)
 	struct hw_controller *controller = &aml_chip->controller;
 	struct nand_flash *flash = &aml_chip->flash;
 	struct chip_ops_para *ops_para = &aml_chip->ops_para;	
-	struct chip_operation *operation = & aml_chip->operation;
+	//struct chip_operation *operation = & aml_chip->operation;
 
 	unsigned blk_addr, pages_per_blk_shift;
 	unsigned char chip_num = 1, chipnr;
-	unsigned short * tmp_status;
+	//unsigned short * tmp_status;
 	int ret;
 
 	if(ops_para->option & DEV_MULTI_CHIP_MODE){

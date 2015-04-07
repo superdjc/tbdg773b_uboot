@@ -8,6 +8,13 @@
 
 #include <pwr_op.c>
 
+#ifndef CONFIG_CEC_WAKEUP
+#define CONFIG_CEC_WAKEUP       1//for CEC function
+#endif
+#ifdef CONFIG_CEC_WAKEUP
+#include "hdmi_cec_arc.c"
+#endif
+
 static struct arc_pwr_op arc_pwr_op;
 static struct arc_pwr_op *p_arc_pwr_op;
 
@@ -196,18 +203,22 @@ static void switch_to_81()
 
 inline void switch_24M_to_32K(void)
 {
+#ifndef CONFIG_NO_32K_XTAL
 	// ee use 32k, So interrup status can be accessed.
 	writel(readl(P_HHI_MPEG_CLK_CNTL)|(1<<9),P_HHI_MPEG_CLK_CNTL);	
 	switch_to_rtc();
 	udelay__(100);
+#endif
 }
 
 inline void switch_32K_to_24M(void)
 {
+#ifndef CONFIG_NO_32K_XTAL
 	switch_to_81();
 	// ee go back to clk81
 	writel(readl(P_HHI_MPEG_CLK_CNTL)&(~(0x1<<9)),P_HHI_MPEG_CLK_CNTL);
 	udelay__(100);
+#endif
 }
 
 #define v_outs(s,v) {f_serial_puts(s);serial_put_hex(v,32);f_serial_puts("\n"); wait_uart_empty();}
@@ -237,6 +248,12 @@ void enter_power_down()
 	cpu_off();
 	f_serial_puts("CPU off done\n");
 	wait_uart_empty();
+#ifdef CONFIG_CEC_WAKEUP
+    hdmi_cec_func_config = readl(P_AO_DEBUG_REG0); 
+    f_serial_puts("CEC M8:uboot: P_AO_DEBUG_REG0:\n");
+    serial_put_hex(hdmi_cec_func_config,32);
+    f_serial_puts("\n");
+#endif
  	if(p_arc_pwr_op->power_off_at_24M)
 		p_arc_pwr_op->power_off_at_24M();
 

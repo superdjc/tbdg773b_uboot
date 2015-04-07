@@ -884,13 +884,13 @@ static int display_rle8_bitmap (bmp_image_t *img, int xoff, int yoff,
 	int green_shift, red_off;
 
 	x = 0;
-	y = __le32_to_cpu(img->header.height) - 1;
-	ncolors = __le32_to_cpu(img->header.colors_used);
+	y = get_unaligned_le32(img->header.height) - 1;
+	ncolors = get_unaligned_le32(img->header.colors_used);
 	bpp = VIDEO_PIXEL_SIZE;
 	fbp = (unsigned char *)((unsigned int)video_fb_address +
 				(((y + yoff) * VIDEO_COLS) + xoff) * bpp);
 
-	bm = (uchar *)img + __le32_to_cpu(img->header.data_offset);
+	bm = (uchar *)img + get_unaligned_le32(img->header.data_offset);
 
 	/* pre-calculate and setup palette */
 	switch (VIDEO_DATA_FORMAT) {
@@ -1064,11 +1064,11 @@ int video_display_bitmap (ulong bmp_image, int x, int y)
 #endif /* CONFIG_VIDEO_BMP_GZIP */
 	}
 
-	width = le32_to_cpu (bmp->header.width);
-	height = le32_to_cpu (bmp->header.height);
-	bpp = le16_to_cpu (bmp->header.bit_count);
-	colors = le32_to_cpu (bmp->header.colors_used);
-	compression = le32_to_cpu (bmp->header.compression);
+	width = get_unaligned_le32(bmp->header.width);
+	height = get_unaligned_le32 (bmp->header.height);
+	bpp = get_unaligned_le16 (bmp->header.bit_count);
+	colors = get_unaligned_le32 (bmp->header.colors_used);
+	compression = get_unaligned_le32 (bmp->header.compression);
 
 	debug ("Display-bmp: %d x %d  with %d colors\n",
 	       width, height, colors);
@@ -1106,7 +1106,7 @@ int video_display_bitmap (ulong bmp_image, int x, int y)
 	if ((y + height) > VIDEO_VISIBLE_ROWS)
 		height = VIDEO_VISIBLE_ROWS - y;
 
-	bmap = (uchar *) bmp + le32_to_cpu (bmp->header.data_offset);
+	bmap = (uchar *) bmp + get_unaligned_le32 (bmp->header.data_offset);
 	fb = (uchar *) (video_fb_address +
 			((y + height - 1) * VIDEO_COLS * VIDEO_PIXEL_SIZE) +
 			x * VIDEO_PIXEL_SIZE);
@@ -1119,7 +1119,7 @@ int video_display_bitmap (ulong bmp_image, int x, int y)
 #endif
 
 	/* We handle only 4, 8, or 24 bpp bitmaps */
-	switch (le16_to_cpu (bmp->header.bit_count)) {
+	switch (get_unaligned_le16 (bmp->header.bit_count)) {
 	case 4:
 		padded_line -= width / 2;
 		ycount = height;
@@ -1329,7 +1329,7 @@ int video_display_bitmap (ulong bmp_image, int x, int y)
 		break;
 	default:
 		printf ("Error: %d bit/pixel bitmaps not supported by U-Boot\n",
-			le16_to_cpu (bmp->header.bit_count));
+			get_unaligned_le16 (bmp->header.bit_count));
 		break;
 	}
 

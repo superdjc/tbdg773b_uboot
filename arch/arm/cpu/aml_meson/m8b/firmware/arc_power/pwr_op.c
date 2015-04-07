@@ -15,11 +15,17 @@
 
 
 //#define CONFIG_IR_REMOTE_WAKEUP 1//for M8 MBox
+#ifndef CONFIG_CEC_WAKEUP
+#define CONFIG_CEC_WAKEUP       1//for CEC function
+#endif
 
 #ifdef CONFIG_IR_REMOTE_WAKEUP
 #include "irremote2arc.c"
 #endif
 
+#ifdef CONFIG_CEC_WAKEUP
+#include <cec_tx_reg.h>
+#endif
 /*
  * i2c clock speed define for 32K and 24M mode only for M8B
  */
@@ -270,17 +276,9 @@ void init_I2C()
 {
 	unsigned v,speed,reg;
 	struct aml_i2c_reg_ctrl* ctrl;
-
-		//save gpio intr setting
+	//save gpio intr setting
 	gpio_sel0 = readl(0xc8100084);
 	gpio_mask = readl(0xc8100080);
-
-	if(!(readl(0xc8100080) & (1<<8)))//kernel enable gpio interrupt already?
-	{
-		writel(readl(0xc8100084) | (1<<18) | (1<<16) | (0x3<<0),0xc8100084);
-		writel(readl(0xc8100080) | (1<<8),0xc8100080);
-		writel(1<<8,0xc810008c); //clear intr
-	}
 
 	f_serial_puts("i2c init\n");
 
@@ -820,6 +818,41 @@ void m8b_pwm_power_on_at_32K_1()
     m8b_pwm_set_vddEE_voltage(CONFIG_PWM_VDDEE_VOLTAGE);
 }
 #endif 
+
+
+void timera_intr_init()
+{
+	writel(0xffffffff,P_AO_CPU_IRQ_IN0_INTR_STAT_CLR);
+	//enable timer a intr
+	writel(readl(P_AO_CPU_IRQ_IN0_INTR_MASK)|(1<<1),P_AO_CPU_IRQ_IN0_INTR_MASK);
+	//writel(readl(P_AO_CPU_IRQ_IN0_INTR_FIRQ_SEL)|(1<<1),P_AO_CPU_IRQ_IN0_INTR_FIRQ_SEL);// set timer a intr as fiq
+	writel(0x000f,P_ISA_TIMERA);//15us
+	writel((readl(P_ISA_TIMER_MUX)|(1<<16) | (1<<12)) & (~0x3),P_ISA_TIMER_MUX);//start timera, period
+
+	//set pinmux for testing simulate 32k clk
+//	writel(readl(P_AO_RTI_PIN_MUX_REG) & ~(0x3 << 15), P_AO_RTI_PIN_MUX_REG);
+//	writel(readl(P_AO_RTI_PIN_MUX_REG) | (0x1 << 18), P_AO_RTI_PIN_MUX_REG);
+	//bit 5 0: 32k crystal. 1: by pass
+	writel(readl(P_AO_RTC_ADDR0) |	(0x1 << 5), P_AO_RTC_ADDR0);
+}
+
+int Process_Cec_Clk_Irq()
+{
+	unsigned value = 0;
+	value = readl(P_AO_RTC_ADDR0);
+	if(value & (1<<4))
+		value &= (~(1<<4));
+	else
+		value |= 1<<4;
+	writel(value, P_AO_RTC_ADDR0); //toggle AO_RTC_ADDR0 bit[4]: rtc_test_clk.
+	return 0;
+}
+
+void clean_irq_mask()
+{
+	writel(0x0,P_AO_CPU_IRQ_IN0_INTR_MASK);
+}
+
 unsigned int detect_key(unsigned int flags)
 {
     int delay_cnt   = 0;
@@ -832,8 +865,10 @@ unsigned int detect_key(unsigned int flags)
 #ifdef CONFIG_IR_REMOTE_WAKEUP
     //backup the remote config (on arm)
     backup_remote_register();
+#ifndef CONFIG_NON_32K
     //set the ir_remote to 32k mode at ARC
     init_custom_trigger();
+#endif // #ifndef CONFIG_NON_32K
 #endif
 
     writel(readl(P_AO_GPIO_O_EN_N)|(1 << 3),P_AO_GPIO_O_EN_N);
@@ -842,7 +877,34 @@ unsigned int detect_key(unsigned int flags)
 #ifdef CONFIG_AML1218
     prev_status = aml1218_get_charge_status();
 #endif
+
+#ifdef CONFIG_NON_32K
+	timera_intr_init();
+#endif
+/*	while(1)
+			{serial_put_hex(readl(P_AO_RTI_STATUS_REG1),32);
+		f_serial_puts("    *^\n");
+//		udelay__(2000);
+		}
+*/
+	writel(readl(0xc8100084) | (1<<18) | (1<<16) | (0x3<<0),0xc8100084);
+	writel(1<<8,0xc810008c); //clear intr
+
+	writel(readl(0xc8100080) | (1<<24),0xc8100080);//set gpio intr as fiq
+	writel(readl(0xc8100080) | (1<<8),0xc8100080);//set gpio intr as fiq
+
+#ifdef CONFIG_CEC_WAKEUP
+    udelay__(10000);
+    if(hdmi_cec_func_config & 0x1){
+        cec_power_on();
+        cec_msg.log_addr = 4;
+        remote_cec_hw_reset();
+        cec_node_init();
+    }
+#endif
     do {
+		//serial_put_hex(readl(P_AO_RTI_STATUS_REG1),32);
+		//f_serial_puts("** \n");
         /*
          * when extern power status has changed, we need break
          * suspend loop and resume system.
@@ -889,7 +951,6 @@ unsigned int detect_key(unsigned int flags)
             delay_cnt = 0;
         }
 #endif
-
 #ifdef CONFIG_IR_REMOTE_WAKEUP
         if(readl(P_AO_RTI_STATUS_REG2) == 0x4853ffff){
             break;
@@ -897,6 +958,14 @@ unsigned int detect_key(unsigned int flags)
         if(remote_detect_key()){
             exit_reason = 6;
             break;
+        }
+#endif
+#ifdef CONFIG_CEC_WAKEUP
+        if(hdmi_cec_func_config & 0x1){
+          cec_handler();	
+          if(cec_msg.cec_power == 0x1){  //cec power key
+                break;
+            }
         }
 #endif
 
@@ -921,15 +990,22 @@ unsigned int detect_key(unsigned int flags)
                 break;
             }
 #endif
+		if(readl(P_AO_RTI_STATUS_REG1) == 0x1234abcd)
+			break;//power key
+    } while(!(readl(0xc8100088) & (1<<8)));            // power key
 
-    } while (!(readl(0xc8100088) & (1<<8)));            // power key
+	clean_irq_mask();
+	extern disable_irq();
+	disable_irq();
 
     writel(1<<8,0xc810008c);
     writel(gpio_sel0, 0xc8100084);
     writel(gpio_mask,0xc8100080);
 
 #ifdef CONFIG_IR_REMOTE_WAKEUP
+#ifndef CONFIG_NON_32K
     resume_remote_register();
+#endif
 #endif
     return ret;
 }
@@ -939,10 +1015,12 @@ void arc_pwr_register(struct arc_pwr_op *pwr_op)
  #ifdef CONFIG_AML1218
  	pwr_op->power_off_at_24M    = aml1218_power_off_at_24M;
 	pwr_op->power_on_at_24M     = aml1218_power_on_at_24M;
+#ifndef CONFIG_NON_32K
 	pwr_op->power_off_at_32K_1  = aml1218_power_off_at_32K_1;
 	pwr_op->power_on_at_32K_1   = aml1218_power_on_at_32K_1;
 	pwr_op->power_off_at_32K_2  = aml1218_power_off_at_32K_2;
 	pwr_op->power_on_at_32K_2   = aml1218_power_on_at_32K_2;
+#endif
 	pwr_op->power_off_ddr15     = 0;//aml1218_power_off_ddr15;
 	pwr_op->power_on_ddr15      = 0;//aml1218_power_on_ddr15;
 	pwr_op->shut_down           = aml1218_shut_down;

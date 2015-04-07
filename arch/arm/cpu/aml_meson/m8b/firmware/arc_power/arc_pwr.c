@@ -9,6 +9,13 @@
 #include <pwr_op.c>
 #include <linux/types.h>
 
+#ifndef CONFIG_CEC_WAKEUP
+#define CONFIG_CEC_WAKEUP       1//for CEC function
+#endif
+#ifdef CONFIG_CEC_WAKEUP
+#include "hdmi_cec_arc.c"
+#endif
+
 static struct arc_pwr_op arc_pwr_op;
 static struct arc_pwr_op *p_arc_pwr_op;
 
@@ -45,11 +52,11 @@ extern void uart_reset();
 extern void init_ddr_pll(void);
 extern void __udelay(int n);
 
-
 static void timer_init()
 {
 	//100uS stick timer a mode : periodic, timer a enable, timer e enable
-    setbits_le32(P_AO_TIMER_REG,0x1f);
+    //setbits_le32(P_AO_TIMER_REG,0x1f);
+    writel(readl(P_ISA_TIMER_MUX)|0x3,P_ISA_TIMER_MUX);
 }
 
 unsigned  get_tick(unsigned base)
@@ -226,6 +233,8 @@ inline void switch_32K_to_24M(void)
 #define v_outs(s,v) {f_serial_puts(s);serial_put_hex(v,32);f_serial_puts("\n"); wait_uart_empty();}
 
 #define pwr_ddr_off 
+
+
 void enter_power_down()
 {
 	int i;
@@ -253,29 +262,45 @@ void enter_power_down()
 	cpu_off();
 	f_serial_puts("CPU off done\n");
 	wait_uart_empty();
+#ifdef CONFIG_CEC_WAKEUP
+    hdmi_cec_func_config = readl(P_AO_DEBUG_REG0); 
+    f_serial_puts("CEC M8:uboot: P_AO_DEBUG_REG0:\n");
+    serial_put_hex(hdmi_cec_func_config,32);
+    f_serial_puts("\n");
+#endif
  	if(p_arc_pwr_op->power_off_at_24M)
 		p_arc_pwr_op->power_off_at_24M();
 
-
+#ifdef CONFIG_M201_COSTDOWN
+	/* for led */
+    clrbits_le32(P_AO_GPIO_O_EN_N,1<<18);
+	setbits_le32(P_AO_GPIO_O_EN_N,1<<29);
+#endif
+	
 //	while(readl(0xc8100000) != 0x13151719)
 //	{}
 
+//non 32k crystal oscillator platform DONT enter 32k in suspend mode
+#ifndef CONFIG_NON_32K
 	switch_24M_to_32K();
-
+#endif 
 	if(p_arc_pwr_op->power_off_at_32K_1)
 		p_arc_pwr_op->power_off_at_32K_1();
 
 	if(p_arc_pwr_op->power_off_at_32K_2)
 		p_arc_pwr_op->power_off_at_32K_2();
+	
 
 	// gate off:  bit0: REMOTE;   bit3: UART
+#ifndef CONFIG_NON_32K
 	writel(readl(P_AO_RTI_GEN_CNTL_REG0)&(~(0x8)),P_AO_RTI_GEN_CNTL_REG0);
-
+#endif
 	if(uboot_cmd_flag == 0x87654321)//u-boot suspend cmd flag
 	{
 		if(p_arc_pwr_op->power_off_ddr15)
 			p_arc_pwr_op->power_off_ddr15();
 	}
+
 	wdt_flag=readl(P_WATCHDOG_TC)&(1<<19);
 	if(wdt_flag)
 		writel(readl(P_WATCHDOG_TC)&(~(1<<19)),P_WATCHDOG_TC);
@@ -306,9 +331,9 @@ void enter_power_down()
 	if(p_arc_pwr_op->power_on_at_32K_1)
 		p_arc_pwr_op->power_on_at_32K_1();
 
-
+#ifndef CONFIG_NON_32K
 	switch_32K_to_24M();
-
+#endif
 
 	// power on even more domains
 	if(p_arc_pwr_op->power_on_at_24M)
@@ -319,6 +344,12 @@ void enter_power_down()
 	wait_uart_empty();
 	ddr_resume();
 
+#ifdef CONFIG_M201_COSTDOWN
+	/* for led */
+    clrbits_le32(P_AO_GPIO_O_EN_N,1<<29);
+	setbits_le32(P_AO_GPIO_O_EN_N,1<<18);
+#endif
+	
 	f_serial_puts("restore pll\n");
 	wait_uart_empty();
 	store_restore_plls(1);//Before switch back to clk81, we need set PLL
@@ -336,6 +367,8 @@ void enter_power_down()
             wait_uart_empty();
         }while(1);
     }
+
+	copy_reboot_code();
 
 	writel(vcin_state,P_AO_RTI_STATUS_REG2);
 	f_serial_puts("restart arm\n");
@@ -365,11 +398,13 @@ int main(void)
 	unsigned cmd;
 	char c;
 	p_arc_pwr_op = &arc_pwr_op;
-//	timer_init();
+	timer_init();
 	arc_pwr_register((struct arc_pwr_op *)p_arc_pwr_op);//init arc_pwr_op
+
+	arc_param->serial_disable=0;
+	serial_put_hex(readl(P_AO_RTI_STATUS_REG1),32);
 	writel(0,P_AO_RTI_STATUS_REG1);
 	f_serial_puts("sleep .......\n");
-	
 
 	while(1){
 		
@@ -383,7 +418,7 @@ int main(void)
 		if(c == 't')
 		{
 			init_I2C();
-			copy_reboot_code();
+//			copy_reboot_code();
 			enter_power_down();
 			//test_arc_core();
 			break;
@@ -450,8 +485,11 @@ int main(void)
 	        f_serial_puts("arm boot succ\n");
 	        wait_uart_empty();
 				    
-		asm(".long 0x003f236f"); //add sync instruction.
-		asm("SLEEP");
+			asm(".long 0x003f236f"); //add sync instruction.
+			asm("flag 1");
+			asm("nop");
+			asm("nop");
+			asm("nop");
 	    }
 	    else
 	    {

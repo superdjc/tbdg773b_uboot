@@ -11,7 +11,7 @@
 #include <bmp_layout.h>
 #include <amlogic/aml_tv.h>
 #include <amlogic/vinfo.h>
-
+#include <linux/unaligned/le_byteshift.h>
 GraphicDevice aml_gdev;
 
 //set default LCD_BPP
@@ -73,7 +73,7 @@ static void video_layer_init(GraphicDevice gdev)
  *-----------------------------------------------------------------------------
  */
 void *video_hw_init (void)
-{	
+{
 	u32 fb_addr, display_width, display_height, display_bpp, color_format_index, fg, bg;
 	u32 fb_width, fb_height;
 	char *layer_str;
@@ -92,7 +92,7 @@ void *video_hw_init (void)
 	layer_str = getenv ("display_layer");
 	fg = simple_strtoul (getenv ("display_color_fg"), NULL, 10);
 	bg = simple_strtoul (getenv ("display_color_bg"), NULL, 10);
-	
+
 	/* fill in Graphic Device */
 	aml_gdev.frameAdrs = fb_addr;
 	aml_gdev.fb_width = fb_width;
@@ -163,14 +163,15 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
     extern vidinfo_t tv_info;
     info = & tv_info;
 #endif
-#if(LCD_BPP ==LCD_COLOR8)	
+#if(LCD_BPP ==LCD_COLOR8)
 	ushort *cmap_base = NULL;
 	unsigned long byte_width;
-#endif	
+#endif
 	ushort i, j;
 	uchar *fb;
 	bmp_image_t *bmp=(bmp_image_t *)bmp_image;
 	uchar *bmap;
+		uchar* t_bmap;
 	ushort padded_line;
 	unsigned long width, height;
 #ifdef CONFIG_OSD_SCALE_ENABLE
@@ -201,11 +202,11 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 		return 1;
 	}
 
-	width = le32_to_cpu (bmp->header.width);
-	height = le32_to_cpu (bmp->header.height);
-	bmp_bpix = le16_to_cpu(bmp->header.bit_count);
+	width = get_unaligned_le32(&bmp->header.width);
+	height = get_unaligned_le32 (&bmp->header.height);
+	bmp_bpix = get_unaligned_le16(&bmp->header.bit_count);
 	colors = 1 << bmp_bpix;
-	compression = le32_to_cpu (bmp->header.compression);
+	compression = get_unaligned_le32 (&bmp->header.compression);
 
 	bpix = NBITS(info->vl_bpix);
 
@@ -249,7 +250,7 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 	if (bpix != bmp_bpix && (bmp_bpix != 8 || bpix != 16)) {
 		printf ("Error: %d bit/pixel mode, but BMP has %d bit/pixel\n",
 			bpix,
-			le16_to_cpu(bmp->header.bit_count));
+			get_unaligned_le16(&bmp->header.bit_count));
 		return 1;
 	}
 
@@ -301,7 +302,7 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
                 osd_enable_hw(0, osd_index);//default to close osd in 'bmp display'
         }
 #endif
-	bmap = (uchar *)bmp + le32_to_cpu (bmp->header.data_offset);
+	bmap = (uchar *)bmp + get_unaligned_le32 (&bmp->header.data_offset);
 	fb   = (uchar *) (info->vd_base +
 		(y + height - 1) * lcd_line_length + x*(LCD_BPP/8));
 
@@ -332,13 +333,16 @@ int video_display_bitmap(ulong bmp_image, int x, int y)
 
 #if(LCD_BPP ==LCD_COLOR16)
 	case 16:
+		t_bmap = bmap;
 		for (i = 0; i < height; ++i) {
+			bmap=t_bmap;
+			bmap += width*2;
+			t_bmap=bmap+(padded_line - width);
 			for (j = 0; j < width; j++) {
 
-				*(fb++) = *(bmap++);
-				*(fb++) = *(bmap++);
+				*(fb++) = *(bmap--);
+				*(fb++) = *(bmap--);
 			}
-			bmap += (padded_line - width) * 2;
 			fb   -= (width * 2 + lcd_line_length);
 		}
 		break;

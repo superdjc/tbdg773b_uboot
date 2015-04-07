@@ -120,7 +120,7 @@
  */
 #define CONFIG_POWER_SPL                            // init power for all domians, must have
 #define CONFIG_VCCK_VOLTAGE             1050        // CPU core voltage when boot, must have
-#define CONFIG_VDDAO_VOLTAGE            1050        // VDDAO voltage when boot, must have
+#define CONFIG_VDDAO_VOLTAGE            1100        // VDDAO voltage when boot, must have
 #define CONFIG_DDR_VOLTAGE              1500        // DDR voltage when boot, must have
 
 #define CONFIG_IOREF_1V8                1800        // IOREV_1.8v voltage when boot, option
@@ -308,6 +308,9 @@
         "if mmcinfo; then "\
             "if fatload mmc 0 ${loadaddr} recovery.img; then bootm;fi;"\
         "fi; "\
+        "if usb start 0; then "\
+                "if fatload usb 0 ${loadaddr} recovery.img; then bootm; fi;"\
+        "fi;"\
 	      "if imgread kernel recovery ${loadaddr}; then "\
 	        "bootm; "\
 				"else "\
