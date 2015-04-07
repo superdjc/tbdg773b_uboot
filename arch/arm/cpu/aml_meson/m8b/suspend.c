@@ -475,6 +475,14 @@ static void auto_clk_gating_setup(
 
 #define APPF_UBOOT_FLAG        (1<<15) //call from uboot
 
+#ifdef CONFIG_MESON_TRUSTZONE
+extern uint32_t meson_trustzone_suspend_uboot(void);
+int meson_power_suspend(void)
+{
+	return meson_trustzone_suspend_uboot();
+}
+#else
+
 //extern void free(void*);
 int meson_power_suspend(void)
 {
@@ -497,6 +505,7 @@ int meson_power_suspend(void)
 
 	return 0;
 }
+#endif
 
 #if 1
 extern void *malloc (size_t len);

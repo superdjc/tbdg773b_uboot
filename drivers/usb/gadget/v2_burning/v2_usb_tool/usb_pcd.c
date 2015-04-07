@@ -153,6 +153,8 @@ static const char dt_string_vid[DT_STRING_VID_LEN]=
 #define _PLATFORM_CHIP_INDEX    '8'
 #elif defined(CONFIG_AML_MESON_6)  
 #define _PLATFORM_CHIP_INDEX    '6'
+#elif defined(CONFIG_AML_G9TV)
+#define _PLATFORM_CHIP_INDEX    '9'
 #else
 #error "chip not supported!"
 #endif// #if defined(CONFIG_AML_MESON_8) 
@@ -215,6 +217,7 @@ int usb_pcd_init(void)
 
 static unsigned int need_check_timeout;
 static unsigned int time_out_val;
+static unsigned int _auto_burn_time_out_base = 0;
 
 void usb_parameter_init(int time_out)
 {
@@ -240,17 +243,26 @@ void usb_parameter_init(int time_out)
 
 int usb_pcd_irq(void)
 {
-	if(need_check_timeout)
-    {
-        unsigned curTime = get_timer(need_check_timeout);
-		if(curTime > time_out_val){
-			dwc_otg_power_off_phy();
-            ERR("Try connect time out %u, %u\n", curTime, time_out_val);
-			return 2;// return to other device boot
-		}
-	}
+        if(need_check_timeout)
+        {
+                unsigned curTime = get_timer(need_check_timeout);
+                if(curTime > time_out_val){
+                        dwc_otg_power_off_phy();
+                        ERR("Try connect time out %u, %u, %u\n", curTime, time_out_val, need_check_timeout);
+                        return 2;// return to other device boot
+                }
+        }
+        if(_auto_burn_time_out_base){
+                unsigned waitIdentifyTime = get_timer(_auto_burn_time_out_base);
+                unsigned timeout = simple_strtoul(getenv(_ENV_TIME_OUT_TO_AUTO_BURN), NULL, 0);
+                if(waitIdentifyTime > timeout){
+                        ERR("waitIdentifyTime(%u) > timeout(%u)\n", waitIdentifyTime, timeout);
+                        _auto_burn_time_out_base = 0;//clear it to allow enter burning next time
+                        return __LINE__;
+                }
+        }
 
-	return dwc_otg_irq();
+        return dwc_otg_irq();
 }
 
 void start_bulk_transfer(pcd_struct_t *_pcd)
@@ -277,7 +289,7 @@ void do_gadget_setup( pcd_struct_t *_pcd, struct usb_ctrlrequest * ctrl)
               if (ctrl->bRequestType != (USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE))
                   break;
               //time_out_val = USB_ROM_DRIVER_TIMEOUT;// Wait SetConfig (PC install driver OK)
-              need_check_timeout = 0;
+              /*need_check_timeout = 0;*/
               switch (w_value >> 8) 
               {
                   case USB_DT_DEVICE:
@@ -369,7 +381,10 @@ void do_gadget_setup( pcd_struct_t *_pcd, struct usb_ctrlrequest * ctrl)
               _pcd->buf = 0;
               _pcd->length = 0;
               _pcd->request_config = 1;   /* Configuration changed */
-              //need_check_timeout = 0;
+              need_check_timeout = 0;
+              if(OPTIMUS_WORK_MODE_USB_UPDATE == optimus_work_mode_get()){//not booting from usb
+                      if(getenv(_ENV_TIME_OUT_TO_AUTO_BURN))_auto_burn_time_out_base = get_timer(0);
+              }
           }
           break;
 
@@ -432,11 +447,12 @@ void do_vendor_request( pcd_struct_t *_pcd, struct usb_ctrlrequest * ctrl)
 		if (ctrl->bRequestType != (USB_DIR_IN | USB_TYPE_VENDOR |
 				USB_RECIP_DEVICE))
 				break;
-		unsigned int data = 0;
+		/*unsigned int data = 0;*/
 		value = (w_value << 16) + w_index;
 
 		//data = _lr(value);
-		*(unsigned int *)buff = data;
+		/**(unsigned int *)(unsigned)buff = data;*/
+                memset((char*)buff, 0, sizeof(unsigned));
 		
 		_pcd->buf = buff;
 		_pcd->length = w_length;
@@ -510,7 +526,7 @@ void do_vendor_request( pcd_struct_t *_pcd, struct usb_ctrlrequest * ctrl)
 
             _pcd->buf = (char*)id;
             _pcd->length = w_length;//FIXME:asset w_length == 4 ??
-            need_check_timeout = 0;
+            _auto_burn_time_out_base = 0;//get burning tool identify command, so clear the timeout flag
             printf("\nID[%d]\n", _pcd->buf[3]);
         }
         break;
@@ -611,9 +627,10 @@ void do_vendor_out_complete( pcd_struct_t *_pcd, struct usb_ctrlrequest * ctrl)
 	  	value = 1; // is_out = 1
       case AM_REQ_RD_LARGE_MEM:
         {	  	
+            const unsigned* intBuf = (unsigned*)buff;
             _pcd->bulk_out = (char)value; // read or write
-            _pcd->bulk_buf = (char *)(*(unsigned int*)buff); // board address
-            _pcd->bulk_data_len = (*(unsigned int*) &buff[4]); // data length
+            _pcd->bulk_buf = (char*)intBuf[0];
+            _pcd->bulk_data_len = intBuf[1]; // data length
 
             //added by Sam.Wu
             _pcd->bulk_xfer_len = 0;
@@ -628,12 +645,13 @@ void do_vendor_out_complete( pcd_struct_t *_pcd, struct usb_ctrlrequest * ctrl)
       case AM_REQ_DOWNLOAD:
         value = 2;//2 to differ from write_large_mem
         {
-            int isPktResended   = *(int*)buff;
-            unsigned sequenceNo = *(unsigned*)(buff + 8);
+            const unsigned* intBuf = (unsigned*)buff;
+            unsigned isPktResended   = intBuf[0];
+            unsigned sequenceNo = intBuf[2];
             _pcd->bulk_out      = value;
-            _pcd->bulk_data_len = *(unsigned*)(buff + 4);
+            _pcd->bulk_data_len = intBuf[1];
             _pcd->bulk_xfer_len = 0;
-            _pcd->origiSum      = *(unsigned*)(buff + 12);
+            _pcd->origiSum      = intBuf[3];
             _pcd->isPktResended = isPktResended;
 
             if(!isPktResended)//request next buffer slot only if transfer packet not re-sended packet

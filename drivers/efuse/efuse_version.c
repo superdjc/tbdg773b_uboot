@@ -124,7 +124,7 @@ static efuseinfo_item_t efuseinfo_v0[] =
 		.bch_reverse = EFUSE_VERSION_BCH_REVERSE, //0,
 	},
 };
-
+//M3
 static efuseinfo_item_t efuseinfo_v1[] =
 {
 	{
@@ -133,7 +133,7 @@ static efuseinfo_item_t efuseinfo_v1[] =
 		.enc_len = V1_EFUSE_USID_ENC_LEN, //35,
 		.data_len = V1_EFUSE_USID_DATA_LEN, //33,
 		.we = 1,
-		.bch_en = V1_EFUSE_USID_BCH_EN, //0,
+		.bch_en = V1_EFUSE_USID_BCH_EN, //1,
 		.bch_reverse = V1_EFUSE_USID_BCH_REVERSE, //0,
 	},	
 	{
@@ -181,6 +181,64 @@ static efuseinfo_item_t efuseinfo_v1[] =
 		.bch_en = 1,
 		.bch_reverse = 0,
 	},
+	{
+		.title= "version",     //1B(version=1)+2B(machid)
+		.offset=EFUSE_VERSION_OFFSET, //380,
+		.enc_len = EFUSE_VERSION_ENC_LEN, //4,
+		.data_len = EFUSE_VERSION_DATA_LEN, //3,
+		.we = 1,
+		.bch_en = EFUSE_VERSION_BCH_EN, //1,
+		.bch_reverse = EFUSE_VERSION_BCH_REVERSE, //0,
+	},
+};
+//M3
+static efuseinfo_item_t efuseinfo_v3[] =
+{
+	{
+		.title = "usid",
+		.offset = V1_EFUSE_USID_OFFSET, //4,
+		.enc_len = V1_EFUSE_USID_ENC_LEN, //35,
+		.data_len = V1_EFUSE_USID_DATA_LEN, //33,
+		.we = 1,
+		.bch_en = V1_EFUSE_USID_BCH_EN, //1,
+		.bch_reverse = V1_EFUSE_USID_BCH_REVERSE, //0,
+	},	
+	{
+		.title = "mac_wifi",
+		.offset = 39,
+		.enc_len = 7,
+		.data_len = 6,
+		.we = 1,
+		.bch_en = 1,
+		.bch_reverse = 0,
+	},
+	{
+		.title = "mac_bt",
+		.offset = 46,
+		.enc_len = 7,
+		.data_len = 6,
+		.we=1,
+		.bch_en = 1,
+		.bch_reverse = 0,
+	},
+	{
+		.title = "mac",
+		.offset = 53,
+		.enc_len = 7,
+		.data_len = 6,
+		.we = 1,
+		.bch_en = 1,
+		.bch_reverse = 0,
+	},
+	{
+		.title = "licence",
+		.offset = 60,
+		.enc_len = 4,
+		.data_len = 3,
+		.we = 1,
+		.bch_en = 1,
+		.bch_reverse = 1,
+	},	
 	{
 		.title= "version",     //1B(version=1)+2B(machid)
 		.offset=EFUSE_VERSION_OFFSET, //380,
@@ -522,6 +580,68 @@ static efuseinfo_item_t efuseinfo_m6tvd_serialNum_v1[] =
 	},
 };
 
+//G9TV efuse layout
+static efuseinfo_item_t efuseinfo_G9TV_serialNum_v1[] = 
+{
+	{
+		.title = "licence",
+		.offset = 0,
+		.enc_len = 4,
+		.data_len = 4,
+		.we=0,
+		.bch_en = 0,
+		.bch_reverse = 0,
+	},
+	{
+		.title = "mac",    //for the main network interface
+		.offset = 436,
+		.enc_len = 6,
+		.data_len = 6,
+		.we=1,
+		.bch_en = 0,
+		.bch_reverse = 0,
+	},
+	{
+		.title = "mac_bt",  //for the second network interface or bt
+		.offset = 442,
+		.enc_len = 6,
+		.data_len = 6,
+		.we=1,
+		.bch_en = 0,
+		.bch_reverse = 0,
+	},
+	{
+		.title = "mac_wifi", //for the second network interface or bt
+		.offset = 448,
+		.enc_len = 6,
+		.data_len = 6,
+		.we = 1,
+		.bch_en = 0,
+		.bch_reverse = 0,
+	},
+	#if !defined(CONFIG_AML_SECU_BOOT_V2_2RSA)
+	{
+		.title = "usid",
+		.offset = 454,
+		.enc_len = 48,
+		.data_len = 48,
+		.we = 1,
+		.bch_en = 0,
+		.bch_reverse = 0,
+	},
+	#endif
+	{
+		.title = "version",
+		.offset = G9TV_EFUSE_VERSION_OFFSET, //509
+		.enc_len = G9TV_EFUSE_VERSION_ENC_LEN, //1
+		.data_len = G9TV_EFUSE_VERSION_DATA_LEN,//1
+		.we = 1,
+		.bch_en = G9TV_EFUSE_VERSION_BCH_EN, //0
+		.bch_reverse = G9TV_EFUSE_VERSION_BCH_REVERSE, //0
+	},
+};
+
+
 efuseinfo_t efuseinfo[] = 
 {
 	{
@@ -538,6 +658,11 @@ efuseinfo_t efuseinfo[] =
 		.efuseinfo_version = efuseinfo_v2,
 		.size = sizeof(efuseinfo_v2)/sizeof(efuseinfo_item_t),
 		.version = 2,
+	},
+	{
+		.efuseinfo_version = efuseinfo_v3,
+		.size = sizeof(efuseinfo_v3)/sizeof(efuseinfo_item_t),
+		.version = 3,
 	},
 #ifdef CONFIG_MESON_TRUSTZONE
 	{
@@ -559,6 +684,11 @@ efuseinfo_t efuseinfo[] =
 		.efuseinfo_version = efuseinfo_m6tvd_serialNum_v1,
 		.size = sizeof(efuseinfo_m6tvd_serialNum_v1)/sizeof(efuseinfo_item_t),
 		.version = M6TVD_EFUSE_VERSION_SERIALNUM_V1,
+	},
+	{
+		.efuseinfo_version = efuseinfo_G9TV_serialNum_v1,
+		.size = sizeof(efuseinfo_G9TV_serialNum_v1)/sizeof(efuseinfo_item_t),
+		.version = G9TV_EFUSE_VERSION_SERIALNUM_V1,
 	},
 };
 

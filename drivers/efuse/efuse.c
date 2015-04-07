@@ -20,14 +20,22 @@ extern int printf(const char *fmt, ...);
 extern void __efuse_write_byte( unsigned long addr, unsigned long data );
 extern void __efuse_read_dword( unsigned long addr, unsigned long *data);
 extern void efuse_init(void);
+#ifdef CONFIG_EFUSE
+struct efuse_hal_api_arg;
+extern int32_t meson_trustzone_efuse(struct efuse_hal_api_arg* arg);
+#endif
 
 ssize_t efuse_read(char *buf, size_t count, loff_t *ppos )
 {
-    unsigned long contents[EFUSE_DWORDS];
 	unsigned pos = *ppos;
-    unsigned long *pdw;
+#ifndef CONFIG_MESON_TRUSTZONE
     unsigned residunt = pos%4;
+#endif
+#ifndef CONFIG_MESON_TRUSTZONE
+    unsigned long contents[EFUSE_DWORDS];
+    unsigned long *pdw;
     unsigned int dwsize = (count+residunt+3)>>2;
+#endif
     
 	if (pos >= EFUSE_BYTES)
 		return 0;
@@ -78,7 +86,6 @@ ssize_t efuse_read(char *buf, size_t count, loff_t *ppos )
 ssize_t efuse_write(const char *buf, size_t count, loff_t *ppos )
 { 	
 	unsigned pos = *ppos;
-	const char *pc;
 
 	if (pos >= EFUSE_BYTES)
 		return 0;	/* Past EOF */
@@ -88,6 +95,7 @@ ssize_t efuse_write(const char *buf, size_t count, loff_t *ppos )
 		return -1;
 
 #ifndef CONFIG_MESON_TRUSTZONE
+	const char *pc;
 	//Wr( EFUSE_CNTL1, Rd(EFUSE_CNTL1) |  (1 << 12) );
     
     for (pc = buf; count>0;count--, ++pos, ++pc)
@@ -105,7 +113,7 @@ ssize_t efuse_write(const char *buf, size_t count, loff_t *ppos )
 	arg.offset = pos;
 	arg.size=count;
 	arg.buffer_phy=(unsigned int)buf;
-	arg.retcnt_phy=&retcnt;
+	arg.retcnt_phy=(unsigned int)&retcnt;
 	int ret;
 	ret = meson_trustzone_efuse(&arg);
 	if(ret==0){
@@ -163,6 +171,8 @@ struct efuse_chip_identify_t{
 	efuse_socchip_type_e type;
 };
 static const struct efuse_chip_identify_t efuse_chip_hw_info[]={
+	{.chiphw_mver=0x1e, .chiphw_subver=0, .chiphw_thirdver=0, .type=EFUSE_SOC_CHIP_G9TV},      //G9BB ok
+	{.chiphw_mver=28, .chiphw_subver=0, .chiphw_thirdver=0, .type=EFUSE_SOC_CHIP_G9TV},      //G9TV ok
 	{.chiphw_mver=27, .chiphw_subver=0, .chiphw_thirdver=0, .type=EFUSE_SOC_CHIP_M8BABY},      //M8BABY ok
 	{.chiphw_mver=26, .chiphw_subver=0, .chiphw_thirdver=0, .type=EFUSE_SOC_CHIP_M6TVD},      //M6TVD ok
 	{.chiphw_mver=25, .chiphw_subver=0, .chiphw_thirdver=0, .type=EFUSE_SOC_CHIP_M8},      //M8 ok
@@ -177,8 +187,8 @@ static const struct efuse_chip_identify_t efuse_chip_hw_info[]={
 efuse_socchip_type_e efuse_get_socchip_type(void)
 {
 	efuse_socchip_type_e type;
-	unsigned int *pID1 =(unsigned int *)0xd9040004;
-	unsigned int *pID2 =(unsigned int *)0xd904002c;
+	//unsigned int *pID1 =(unsigned int *)0xd9040004;
+	//unsigned int *pID2 =(unsigned int *)0xd904002c;
 	type = EFUSE_SOC_CHIP_UNKNOW;
 	if(cpu_is_before_m6()){
 		type = EFUSE_SOC_CHIP_M3;
@@ -234,6 +244,11 @@ static int efuse_checkversion(char *buf)
 				case EFUSE_SOC_CHIP_M8BABY:
 					if((ver != M8_EFUSE_VERSION_SERIALNUM_V1)&&
 						ver != M8_EFUSE_VERSION_SERIALNUM_V2_2RSA){
+						ver = -1;
+					}
+					break;
+				case EFUSE_SOC_CHIP_G9TV:
+					if(ver != G9TV_EFUSE_VERSION_SERIALNUM_V1){
 						ver = -1;
 					}
 					break;
@@ -366,6 +381,9 @@ static int efuse_getinfo_byPOS(unsigned pos, efuseinfo_item_t *info)
 			break;
 		case EFUSE_SOC_CHIP_M6TVD:
 			versionPOS = M6TVD_EFUSE_VERSION_OFFSET;
+			break;
+		case EFUSE_SOC_CHIP_G9TV:
+			versionPOS = G9TV_EFUSE_VERSION_OFFSET;
 			break;
 		case EFUSE_SOC_CHIP_UNKNOW:
 		default:
@@ -658,6 +676,15 @@ int efuse_set_versioninfo(efuseinfo_item_t *info)
 			info->bch_reverse = M6TVD_EFUSE_VERSION_BCH_REVERSE;
 			ret = 0;
 			break;
+		case EFUSE_SOC_CHIP_G9TV:
+			info->offset = G9TV_EFUSE_VERSION_OFFSET;
+			info->data_len = G9TV_EFUSE_VERSION_DATA_LEN;
+			info->enc_len = G9TV_EFUSE_VERSION_ENC_LEN;
+			info->bch_en = G9TV_EFUSE_VERSION_BCH_EN;
+			info->we = 1;
+			info->bch_reverse = G9TV_EFUSE_VERSION_BCH_REVERSE;
+			ret = 0;
+			break;
 		case EFUSE_SOC_CHIP_UNKNOW:
 		default:
 			printf("efuse: soc is error\n");
@@ -789,6 +816,8 @@ unsigned efuse_readcustomerid(void)
 		case EFUSE_SOC_CHIP_M8BABY:
 			break;
 		case EFUSE_SOC_CHIP_M6TVD:
+			break;
+		case EFUSE_SOC_CHIP_G9TV:
 			break;
 		case EFUSE_SOC_CHIP_UNKNOW:
 		default:
@@ -938,6 +967,8 @@ int efuse_aml_init_plus(void)
 	}
 	else if(soc_type == EFUSE_SOC_CHIP_M6TVD ){
 	}
+	else if(soc_type == EFUSE_SOC_CHIP_G9TV){
+	}
 #endif
 	return nRet;
 }
@@ -1015,6 +1046,8 @@ int efuse_read_intlItem(char *intl_item,char *buf,int size)
 			}
 			break;
 		case EFUSE_SOC_CHIP_M6TVD:
+			break;
+		case EFUSE_SOC_CHIP_G9TV:
 			break;
 		case EFUSE_SOC_CHIP_UNKNOW:
 		default:

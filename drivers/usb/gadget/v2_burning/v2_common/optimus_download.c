@@ -20,7 +20,7 @@
 #endif//#if defined(CONFIG_ACS)
 
 extern unsigned int get_multi_dt_entry(unsigned int fdt_addr);
-static int is_optimus_storage_inited(void);
+int is_optimus_storage_inited(void);
 
 #ifndef CONFIG_UNIFY_KEY_MANAGE
 int v2_key_read(const char* keyName, u8* keyVal, const unsigned keyValLen, char* errInfo, unsigned* fmtLen)
@@ -92,6 +92,7 @@ struct imgBurnInfo_bootloader{
 COMPILE_TIME_ASSERT(IMG_BURN_INFO_SZ == sizeof(struct ImgBurnInfo));
 
 #if defined(CONFIG_ACS)
+#if 0
 static void _show_partition_table(const struct partitions* pPartsTab)
 {
 	int i=0;
@@ -108,16 +109,17 @@ static void _show_partition_table(const struct partitions* pPartsTab)
 	
 	return;
 }
+#endif
 
 static int _check_partition_table_consistency(const unsigned uboot_bin)
 {
     int rc = 0;
-    const int partitionTableSz = MAX_PART_NUM * sizeof(struct partitions);
+    unsigned partitionTableSz = 0;
     const int acsOffsetInSpl   = START_ADDR - AHB_SRAM_BASE;
     const int addrMapFromAhb2Bin = AHB_SRAM_BASE - uboot_bin;
 
     const struct acs_setting* acsSettingInBin   = NULL;
-    unsigned partTabAddrInBin             = NULL;
+    unsigned partTabAddrInBin             = 0;
     const struct partitions*  partsTabInBin     = NULL;
 
     const struct acs_setting* acsSettingInSram  = NULL;
@@ -125,12 +127,12 @@ static int _check_partition_table_consistency(const unsigned uboot_bin)
 
     DWN_DBG("uboot_bin 0x%p, acsOffsetInSpl 0x%x, addrMapFromAhb2Bin 0x%x\n", uboot_bin, acsOffsetInSpl, addrMapFromAhb2Bin);
     acsSettingInBin   = (struct acs_setting*)(*(unsigned*)(uboot_bin + acsOffsetInSpl) - addrMapFromAhb2Bin);
-    DWN_MSG("acsSettingInBin=0x%x\n", acsSettingInBin);
     
-    if( acsSettingInBin >= uboot_bin + 64*1024 || acsSettingInBin <= uboot_bin){//acs not in the spl
+    if( (unsigned)acsSettingInBin >= uboot_bin + 64*1024 || (unsigned)acsSettingInBin <= uboot_bin){//acs not in the spl
         DWN_MSG("Acs not in the spl of uboot_bin\n");
         return 0;
     }
+
     if(memcmp(MAGIC_ACS, acsSettingInBin->acs_magic, strlen(MAGIC_ACS))
         || memcmp(TABLE_MAGIC_NAME, acsSettingInBin->partition_table_magic, strlen(TABLE_MAGIC_NAME)))
     {
@@ -160,6 +162,9 @@ static int _check_partition_table_consistency(const unsigned uboot_bin)
 #ifdef CONFIG_MESON_TRUSTZONE
     partsTabInSram    = (const struct partitions*)meson_trustzone_acs_addr((unsigned)&acsSettingInSram->partition_table_addr);
 #endif// #ifndef CONFIG_MESON_TRUSTZONE
+
+    partitionTableSz = acsSettingInBin->partition_table_length;
+    DWN_MSG("acsSettingInBin=0x%x, partTabSz=0x%x\n", (unsigned int)acsSettingInBin, partitionTableSz);
 
     rc = memcmp(partsTabInSram, partsTabInBin, partitionTableSz);
     DWN_MSG("Check parts table %s\n", !rc ? "OK." : "FAILED!");
@@ -192,7 +197,6 @@ static int _assert_logic_partition_cap(const char* thePartName, const uint64_t n
 	extern struct partitions * part_table;
 
 	struct partitions * thePart = NULL;
-	int i=0;
 
         for(thePart = part_table; NAND_PART_SIZE_FULL != thePart->size; ++thePart)
         {
@@ -472,7 +476,7 @@ static u32 optimus_storage_write(struct ImgBurnInfo* pDownInfo, u64 addrOrOffset
                 if(is_optimus_storage_inited() || 
                                 (OPTIMUS_WORK_MODE_USB_PRODUCE != optimus_work_mode_get()))
                 {
-                        destDtb = get_multi_dt_entry(data);
+                        destDtb = (unsigned char*)get_multi_dt_entry((unsigned int)data);
                 }
                 rc = fdt_check_header(destDtb);
                 if(rc){
@@ -720,7 +724,7 @@ int optimus_parse_img_download_info(const char* partName, const u64 imgSz, const
 
 static int _disk_intialed_ok = 0;
 
-static int is_optimus_storage_inited(void)
+int is_optimus_storage_inited(void)
 {
         return _disk_intialed_ok;
 }
@@ -782,7 +786,8 @@ int optimus_storage_init(int toErase)
 
     if(!ret)
     {
-        _disk_intialed_ok = 1;
+        _disk_intialed_ok  = 1;
+        _disk_intialed_ok += toErase <<16;
 
         if(OPTIMUS_WORK_MODE_USB_PRODUCE == optimus_work_mode_get())//env not relocated in this case
         {
@@ -1202,7 +1207,7 @@ void optimus_reset(const int cfgFlag)
 
 #if defined(CONFIG_M6) || defined(CONFIG_M6TV)
     //if not clear, uboot command reset will fail -> blocked
-    *((volatile unsigned long *)0xc8100000) = 0;
+    *((volatile unsigned long *)P_AO_RTI_STATUS_REG0) = 0;
 #endif//#if defined(CONFIG_M6) || defined(CONFIG_M6TV)
     printf("Burn Reboot...\n");//Add printf to delay to save env
     while(--i);
@@ -1296,12 +1301,13 @@ int optimus_burn_complete(const int choice)
 int optimus_enable_romboot_skip_boot(void)
 {
 #ifdef CONFIG_MESON_TRUSTZONE
-	writel(meson_trustzone_sram_read_reg32(SKIP_BOOT_REG_BACK_ADDR), 0xc8100000); //disable watchdog
+	writel(meson_trustzone_sram_read_reg32(SKIP_BOOT_REG_BACK_ADDR), P_AO_RTI_STATUS_REG0); //disable watchdog
 #else
-	writel(readl(SKIP_BOOT_REG_BACK_ADDR), 0xc8100000); //disable watchdog
+	writel(readl(SKIP_BOOT_REG_BACK_ADDR), P_AO_RTI_STATUS_REG0); //disable watchdog
 #endif// #ifdef CONFIG_MESON_TRUSTZONE
 
 	//enable romboot skip_boot function to jump to usb boot
-    DWN_MSG("Skip boot flag[%x]\n", readl(0xc8100000));
+    DWN_MSG("Skip boot flag[%x]\n", (unsigned int)readl(P_AO_RTI_STATUS_REG0));
+    return 0;
 }
 #endif// #if ROM_BOOT_SKIP_BOOT_ENABLED
