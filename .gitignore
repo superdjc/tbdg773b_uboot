@@ -32,9 +32,6 @@
 /u-boot-onenand.bin
 /u-boot-flexonenand.bin
 /build
-/include/configs/amlogic
-include/configs/customer
-/customer
 
 #
 # Generated files
@@ -74,3 +71,4 @@ cscope.*
 /onenand_ipl/onenand-ipl*
 /onenand_ipl/board/*/onenand*
 /onenand_ipl/board/*/*.S
+/.directory
